@@ -1,0 +1,2477 @@
+{
+  "name": "Apex Workflow 1 - Lead Capture and Validation",
+  "nodes": [
+    {
+      "parameters": {
+        "errorMessage": "Validation failed: One or more required fields are missing or invalid. Required: First Name, Last Name, valid Email, Phone Number, Street Address, City."
+      },
+      "id": "cce87e1d-15de-497a-b4d1-052993a6d4d0",
+      "name": "Stop - Missing Fields",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "duplicate_submission"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({ source: 'website_form', matched_on: $json.phone ? 'phone' : 'email' }) }}"
+            }
+          ]
+        }
+      },
+      "id": "cfd681c3-c4be-4673-b76b-67ea2295f3a5",
+      "name": "Supabase - Log Duplicate",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        816,
+        176
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "errorMessage": "Duplicate submission detected. A lead with this phone number or email already exists within the last 24 hours."
+      },
+      "id": "8d53c9df-c7ac-49a5-8c04-f796de38eca0",
+      "name": "Stop - Duplicate Lead",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the data from the OpenAI node specifically\nconst aiContent = $(\"AI - Lead Validation (OpenAI)\").first().json.choices[0].message.content;\nconst r = JSON.parse(aiContent).lead;\n\n// 2. Title Case Helper\nconst tc = s => (s || '').trim().replace(/\\b\\w/g, c => c.toUpperCase());\n\n// 3. Strip HTML tags from user-controlled strings (prevents XSS in emails and PDF)\nconst stripHtml = s => (s || '').replace(/<[^>]*>/g, '').trim();\n\n// 4. Phone Formatter Helper\nconst ph = p => {\n  const d = (p || '').replace(/\\D/g, '');\n  return d.length === 10\n    ? d.replace(/(\\d{3})(\\d{3})(\\d{4})/, '$1-$2-$3')\n    : (p || '').trim();\n};\n\n// 5. Return the cleaned data\nreturn [{\n  json: {\n    name_clean: stripHtml(tc(r.first_name) + ' ' + tc(r.last_name)),\n    phone_clean: ph(r.phone),\n    email_clean: (r.email || '').toLowerCase().trim(),\n\n    addr_clean: [\n      tc(r.street_address || ''),\n      tc(r.city || ''),\n      'TX'\n    ].filter(Boolean).join(', '),\n\n    issue_clean: stripHtml((r.issue || '').trim()).slice(0, 1000),\n    window_count: r.windows\n  }\n}];"
+      },
+      "id": "543972a3-7863-475f-b087-c589f27a134d",
+      "name": "Code - Sanitise Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json['First Name'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "condition3",
+              "leftValue": "={{ $json['Email Address'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "condition4",
+              "leftValue": "={{ $json['Email Address'] }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "id": "condition5",
+              "leftValue": "={{ $json['Phone Number'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "condition6",
+              "leftValue": "={{ $json['Street Address'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "condition7",
+              "leftValue": "={{ $json['City'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "condition8",
+              "leftValue": "={{ $json['Number of Windows'] }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "condition9",
+              "leftValue": "={{ $json['Number of Windows'] }}",
+              "rightValue": 20,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ca0d534c-2415-4b07-bd00-24aba2dbe091",
+      "name": "IF - Validate Required Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -304,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/rest/v1/leads",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "or",
+              "value": "=(phone.eq.\"{{ JSON.parse($json.choices[0].message.content).lead.phone }}\",email.eq.\"{{ JSON.parse($json.choices[0].message.content).lead.email }}\")"
+            },
+            {
+              "name": "created_at",
+              "value": "=gte.{{ new Date(Date.now() - 24*60*60*1000).toISOString() }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "select",
+              "value": "id,phone,email"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "0218fd09-10e0-4495-832a-2326b41edc10",
+      "name": "HTTP Request - Dedup Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        368,
+        272
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "815b605a-a56a-4f63-8749-1159b785c584",
+      "name": "IF - Is Duplicate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.name_clean }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $json.phone_clean }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email_clean }}"
+            },
+            {
+              "fieldId": "address",
+              "fieldValue": "={{ $json.addr_clean }}"
+            },
+            {
+              "fieldId": "issue_description",
+              "fieldValue": "={{ $json.issue_clean }}"
+            },
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "New Lead"
+            }
+          ]
+        }
+      },
+      "id": "34139800-f36c-467a-93b7-a88911d6091f",
+      "name": "Supabase - Create Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "lead_created"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({ source: 'website_form' }) }}"
+            }
+          ]
+        }
+      },
+      "id": "f4daa3bf-7b9a-4804-8adc-6facdeb8f044",
+      "name": "Supabase - Log Lead Created",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "escalations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.lead_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "quote_not_sent"
+            },
+            {
+              "fieldId": "due_at",
+              "fieldValue": "={{ new Date(Date.now() + 24*60*60*1000).toISOString() }}"
+            },
+            {
+              "fieldId": "resolved",
+              "fieldValue": "=false"
+            }
+          ]
+        }
+      },
+      "id": "a1577df9-6789-4252-a47e-cdc540ed0a60",
+      "name": "Supabase - Create Escalation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lead_id",
+              "name": "lead_id",
+              "value": "={{ $('Supabase - Create Lead').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "window_form_url",
+              "name": "window_form_url",
+              "value": "=https://apexwindowstx.com/window-details?lead={{ $('Supabase - Create Lead').first().json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_name",
+              "name": "lead_name",
+              "value": "={{ $('Code - Sanitise Fields').first().json.name_clean }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_email",
+              "name": "lead_email",
+              "value": "={{ $('Code - Sanitise Fields').first().json.email_clean }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_phone",
+              "name": "lead_phone",
+              "value": "={{ $('Code - Sanitise Fields').first().json.phone_clean }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_address",
+              "name": "lead_address",
+              "value": "={{ $('Code - Sanitise Fields').first().json.addr_clean }}",
+              "type": "string"
+            },
+            {
+              "id": "issue_clean",
+              "name": "issue_clean",
+              "value": "={{ $('Code - Sanitise Fields').first().json.issue_clean }}",
+              "type": "string"
+            },
+            {
+              "id": "submitted_at",
+              "name": "submitted_at",
+              "value": "={{ $('Supabase - Create Lead').first().json.created_at }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "73885f38-e417-4781-8a02-e7af02c2fd91",
+      "name": "Set - Build Window Form URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "sales-manager@example.com",
+        "toEmail": "sales-manager@example.com",
+        "subject": "=New Lead: {{ $json.lead_name }} — {{ $json.lead_address }}",
+        "html": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>New Lead</title>\n</head>\n<body style=\"margin:0; padding:20px; background-color:#f4f6f8; font-family:Arial, sans-serif;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n    <tr>\n      <td align=\"center\">\n\n        <!-- Card -->\n        <table width=\"500\" cellpadding=\"20\" cellspacing=\"0\" border=\"0\" style=\"background:#ffffff; border-radius:8px;\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"text-align:center;\">\n              <h2 style=\"margin:0; color:#1565C0;\">New Lead Received</h2>\n            </td>\n          </tr>\n\n          <!-- Content -->\n          <tr>\n            <td>\n              <table width=\"100%\" cellpadding=\"6\" cellspacing=\"0\" border=\"0\" style=\"font-size:14px; color:#333;\">\n                \n                <tr>\n                  <td><strong>Name:</strong></td>\n                  <td>{{ $json.lead_name }}</td>\n                </tr>\n\n                <tr>\n                  <td><strong>Phone:</strong></td>\n                  <td>\n                    <a href=\"tel:{{ $json.lead_phone }}\" style=\"color:#1565C0; text-decoration:none;\">\n                      {{ $json.lead_phone }}\n                    </a>\n                  </td>\n                </tr>\n\n                <tr>\n                  <td><strong>Email:</strong></td>\n                  <td>{{ $json.lead_email }}</td>\n                </tr>\n\n                <tr>\n                  <td><strong>Address:</strong></td>\n                  <td>{{ $json.lead_address }}</td>\n                </tr>\n\n                <tr>\n                  <td><strong>Issue:</strong></td>\n                  <td>{{ $json.issue_clean }}</td>\n                </tr>\n\n                <tr>\n                  <td><strong>Submitted:</strong></td>\n                  <td>{{ $json.submitted_at }}</td>\n                </tr>\n\n              </table>\n            </td>\n          </tr>\n\n          <!-- Button -->\n          <tr>\n            <td align=\"center\">\n              <a href=\"https://apexwindowscrm.vercel.app/\"\n                 style=\"background:#1565C0; color:#ffffff; padding:12px 24px; text-decoration:none; border-radius:5px; font-weight:bold; display:inline-block;\">\n                VIEW IN CRM\n              </a>\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "d43f2916-21dc-4376-accb-58f831ec30bd",
+      "name": "Send Email - Sales Manager New Lead",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1888,
+        400
+      ],
+      "webhookId": "dce814c2-abc1-4e12-ac32-ec0aaaf21c16",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst windows = input.json.windows;\nconst binary = input.binary || {};\nconst lead_id = input.json.lead_id;\n\nreturn windows.map(w => ({\n  json: {\n    ...w,\n    lead_id\n  },\n  binary: w.photo_key && binary[w.photo_key] ? { photo: binary[w.photo_key] } : {}\n}));"
+      },
+      "id": "9c7259e8-edb1-4a9a-8e3c-86eb78aee9ec",
+      "name": "Code - Split Windows Into Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2576,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "aa799557-5488-43f0-adff-302d892e1b63",
+              "leftValue": "={{ Boolean($json.photo_key) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2896,
+        432
+      ],
+      "id": "002fcbfc-5fe7-4111-a6de-2ae606e0887e",
+      "name": "If- Has Photo"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/storage/v1/object/window-photos/{{ $json.lead_id }}/{{ $json.photo_filename }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "={{ $json.photo_mime }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "photo",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "871924bd-021f-410b-8fe2-4bfb87e2ab58",
+      "name": "HTTP Request - Upload Photo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3088,
+        272
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "photo_url",
+              "name": "photo_url",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "b4ca2c56-b4f9-46e8-b748-83431f803f8a",
+      "name": "Set - Photo URL Null",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3280,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "windows",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.lead_id }}"
+            },
+            {
+              "fieldId": "issue_type",
+              "fieldValue": "={{ $json.issue_type }}"
+            },
+            {
+              "fieldId": "other_description",
+              "fieldValue": "={{ $json.other_description }}"
+            },
+            {
+              "fieldId": "photo_url",
+              "fieldValue": "={{ $json.photo_url }}"
+            },
+            {
+              "fieldId": "notes",
+              "fieldValue": "={{ $json.notes }}"
+            }
+          ]
+        }
+      },
+      "id": "2a809dd8-66c7-4e2c-9d83-c520f74c6b23",
+      "name": "Supabase - Save Window Record",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3728,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lead_id",
+              "name": "lead_id",
+              "value": "={{ $('Code - Split Windows Into Items').item.json.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "issue_type",
+              "name": "issue_type",
+              "value": "={{ $('Code - Split Windows Into Items').item.json.issue_type }}",
+              "type": "string"
+            },
+            {
+              "id": "other_description",
+              "name": "other_description",
+              "value": "={{ $('Code - Split Windows Into Items').item.json.other_description }}",
+              "type": "string"
+            },
+            {
+              "id": "notes",
+              "name": "notes",
+              "value": "={{ $('Code - Split Windows Into Items').item.json.notes }}",
+              "type": "string"
+            },
+            {
+              "id": "window_number",
+              "name": "window_number",
+              "value": "={{ $('Code - Split Windows Into Items').item.json.window_number }}",
+              "type": "number"
+            },
+            {
+              "id": "photo_url",
+              "name": "photo_url",
+              "value": "=https://{{SUPABASE_PROJECT_URL}}/storage/v1/object/public/window-photos/{{ $('Code - Split Windows Into Items').item.json.lead_id }}/{{ $('Code - Split Windows Into Items').item.json.photo_filename }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "09e3268a-f99d-43e1-8069-e2e7f344bfa4",
+      "name": "Set - Build Photo URL1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3280,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            },
+            {
+              "keyName": "pipeline_stage",
+              "condition": "eq",
+              "keyValue": "New Lead"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Window Details Received"
+            }
+          ]
+        }
+      },
+      "id": "0df726b8-6f5d-4730-8502-1809fdb9b552",
+      "name": "Supabase - Pipeline Window Details Received",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3952,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?lead_id=eq.{{ $json.id }}&resolved=is.false",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ \"type\": \"quote_approval_pending\", \"due_at\": new Date(Date.now() + 24*60*60*1000).toISOString() }) }}",
+        "options": {}
+      },
+      "id": "dfb41764-3ae3-4e09-b859-dc320087e7c0",
+      "name": "Supabase - Update Escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -688,
+        1456
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/rest/v1/windows?lead_id=eq.{{ $json.lead_id }}&order=created_at.asc&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_JWT}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "53776919-226a-44c2-a647-7ad9a5e5b005",
+      "name": "Supabase - Fetch All Windows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -464,
+        1456
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/rest/v1/pricing_config?select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_JWT}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "e8e6bdba-1207-4f18-8fc5-e7f912d04330",
+      "name": "Supabase - Fetch Pricing Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -240,
+        1456
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const wins = $('Supabase - Fetch All Windows2').all().map(i => i.json);\nconst pricing = {};\n$('Supabase - Fetch Pricing Config1').all().forEach(i => {\n  pricing[i.json.service_type] = parseFloat(i.json.base_price);\n});\n\nif (Object.keys(pricing).length === 0) {\n  throw new Error('Pricing configuration is empty — cannot generate estimate. Check the pricing_config table.');\n}\n\nconst lead = $('Supabase - Pipeline Window Details Received').first().json;\nconst issue = lead.issue_description;\n\n// Strip HTML and limit length to prevent prompt injection from notes\nconst safeText = s => (s || '').replace(/<[^>]*>/g, '').replace(/\\n{3,}/g, '\\n\\n').trim().slice(0, 1000);\n\n// Deduplicate windows by id\nconst seen = new Set();\nconst uniqueWins = wins.filter(w => {\n  if (seen.has(w.id)) return false;\n  seen.add(w.id);\n  return true;\n});\n\nconst winList = uniqueWins.map((w, i) => {\n  const svc = w.issue_type === 'Foggy/Broken' ? 'foggy_glass_igu'\n    : w.issue_type === 'Full Window Replacement' ? 'full_window_replacement'\n    : 'other_service';\n  const bp = pricing[svc] || 200;\n  const desc = w.issue_type === 'Other' ? `Other (${w.other_description || 'see notes'})` : w.issue_type;\n  return `Window ${i+1}: ${desc} | Notes: ${safeText(w.notes) || 'None'} | Base $${bp}`;\n}).join('\\n');\n\nconst prompt = `You are an estimator for Apex Windows TX (foggy glass / window replacement, Dallas-Fort Worth TX).\\n\\nWINDOWS:\\n${winList}\\n\\nCUSTOMER DESCRIPTION: ${safeText(issue)}\\n\\nPRICING:\\n- Foggy/Broken IGU: $${pricing.foggy_glass_igu || 250}/unit base\\n- Full Replacement: $${pricing.full_window_replacement || 650}/unit base\\n- Other/Custom: $${pricing.other_service || 200} base\\n\\nRULES: Assess each window. Apply multiplier 1.0 (standard) to 1.4 (complex) based on notes. Texas tax = 8.25%. Write 2-sentence customer_note (warm). 1-sentence sales_manager_note.\\n\\nRESPOND WITH ONLY VALID JSON — no markdown, no text outside the JSON:\\n{\\n  \"line_items\": [{\"window_number\":1,\"description\":\"IGU Replacement\",\"base_price\":250,\"multiplier\":1.0,\"final_price\":250,\"complexity_note\":\"Standard\"}],\\n  \"subtotal\":250,\"tax_rate\":0.0825,\"tax_amount\":20.63,\"total\":270.63,\\n  \"customer_note\":\"Two sentences.\",\"sales_manager_note\":\"One sentence.\"\\n}`;\n\nreturn [{ json: { prompt, lead_id: lead.id, lead_name: lead.name, lead_email: lead.email, lead_phone: lead.phone, lead_address: lead.address } }];"
+      },
+      "id": "c95081e6-7650-4288-88ef-5b9f21b8c7a9",
+      "name": "Code - Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4848,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: \"json_object\" }, messages: [{ role: \"user\", content: $json.prompt }] }) }}",
+        "options": {}
+      },
+      "id": "254e9962-4c15-419f-bea8-effd90bf0379",
+      "name": "HTTP Request - OpenAI API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5072,
+        368
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\nconst lead = $('Code - Build AI Prompt').first().json;\n\ntry {\n  const estimate = JSON.parse(raw);\n  return [{ json: {\n    estimate,\n    parse_ok: true,\n    lead_id: lead.lead_id,\n    lead_name: lead.lead_name,\n    lead_email: lead.lead_email,\n    lead_phone: lead.lead_phone,\n    lead_address: lead.lead_address\n  }}];\n} catch(e) {\n  return [{ json: {\n    estimate: {\n      line_items: [{ window_number: 1, description: 'Manual Review Required', base_price: 0, multiplier: 1, final_price: 0, complexity_note: 'AI parse failed' }],\n      subtotal: 0,\n      tax_rate: 0.0825,\n      tax_amount: 0,\n      total: 0,\n      customer_note: 'We have received your request and are preparing a personalised quote for you.',\n      sales_manager_note: 'AI PARSE FAILED - manual estimate required.'\n    },\n    parse_ok: false,\n    raw_response: raw,\n    lead_id: lead.lead_id,\n    lead_name: lead.lead_name,\n    lead_email: lead.lead_email,\n    lead_phone: lead.lead_phone,\n    lead_address: lead.lead_address\n  }}];\n}"
+      },
+      "id": "f5725e5a-1b89-4aa3-985f-01e4998f461d",
+      "name": "Code - Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5296,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "estimates",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.lead_id }}"
+            },
+            {
+              "fieldId": "line_items",
+              "fieldValue": "={{ JSON.stringify($json.estimate.line_items) }}"
+            },
+            {
+              "fieldId": "subtotal",
+              "fieldValue": "={{ $json.estimate.subtotal }}"
+            },
+            {
+              "fieldId": "tax_rate",
+              "fieldValue": "={{ $json.estimate.tax_rate }}"
+            },
+            {
+              "fieldId": "tax_amount",
+              "fieldValue": "={{ $json.estimate.tax_amount }}"
+            },
+            {
+              "fieldId": "total",
+              "fieldValue": "={{ $json.estimate.total }}"
+            },
+            {
+              "fieldId": "customer_note",
+              "fieldValue": "={{ $json.estimate.customer_note }}"
+            },
+            {
+              "fieldId": "sales_manager_note",
+              "fieldValue": "={{ $json.estimate.sales_manager_note }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending_review"
+            },
+            {
+              "fieldId": "ai_generated",
+              "fieldValue": "=true"
+            }
+          ]
+        }
+      },
+      "id": "278bd1a7-8111-4a11-8868-dca8aad54321",
+      "name": "Supabase - Save Estimate",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5520,
+        368
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Estimate Generated"
+            }
+          ]
+        }
+      },
+      "id": "5dc2fd8d-12be-44a5-9468-2c96c46b4714",
+      "name": "Supabase - Pipeline Estimate Generated",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5744,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Supabase - Pipeline Estimate Generated').first().json;\nconst wins = $('Supabase - Fetch All Windows2').all().map(i => i.json);\nconst estimate = $('Code - Parse AI Response').first().json.estimate;\n\n// HTML-escape helper — prevents XSS from breaking PDFShift renderer\nconst esc = s => String(s == null ? '' : s)\n  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n\n// Deduplicate windows\nconst seen = new Set();\nconst uniqueWins = wins.filter(w => {\n  if (seen.has(w.id)) return false;\n  seen.add(w.id);\n  return true;\n});\n\nconst rows = uniqueWins.map((w, i) => {\n  const img = w.photo_url\n    ? `<a href=\"${esc(w.photo_url)}\" style=\"color:#1565C0\">View Photo</a>`\n    : '<em style=\"color:#aaa\">No photo</em>';\n  const iss = w.issue_type === 'Other' ? `Other: ${esc(w.other_description || '')}` : esc(w.issue_type);\n  return `<tr>\n    <td style=\"padding:8px;border:1px solid #ddd\"><b>#${i+1}</b></td>\n    <td style=\"padding:8px;border:1px solid #ddd\">${iss}</td>\n    <td style=\"padding:8px;border:1px solid #ddd\">${esc(w.notes) || '—'}</td>\n    <td style=\"padding:8px;border:1px solid #ddd\">${img}</td>\n  </tr>`;\n}).join('');\n\nconst lineItemRows = estimate.line_items.map(item => `<tr>\n  <td style=\"padding:8px;border:1px solid #ddd\">#${item.window_number}</td>\n  <td style=\"padding:8px;border:1px solid #ddd\">${esc(item.description)}</td>\n  <td style=\"padding:8px;border:1px solid #ddd\">$${item.base_price}</td>\n  <td style=\"padding:8px;border:1px solid #ddd\">${item.multiplier}x</td>\n  <td style=\"padding:8px;border:1px solid #ddd\">$${item.final_price}</td>\n  <td style=\"padding:8px;border:1px solid #ddd\">${esc(item.complexity_note)}</td>\n</tr>`).join('');\n\nconst html = `<!DOCTYPE html><html><head><meta charset=\"UTF-8\">\n<style>\n  body{font-family:Arial,sans-serif;margin:28px;color:#333}\n  .hdr{background:#1565C0;color:#fff;padding:16px 20px;border-radius:6px}\n  h2{color:#1565C0;border-bottom:2px solid #1565C0;padding-bottom:4px}\n  table{width:100%;border-collapse:collapse;margin:8px 0}\n  th{background:#1565C0;color:#fff;padding:8px;text-align:left}\n  .total-row{background:#1565C0;color:#fff;font-weight:bold}\n  .foot{margin-top:24px;font-size:11px;color:#999;text-align:center}\n</style></head><body>\n<div class=\"hdr\">\n  <h1 style=\"margin:0\">Apex Windows TX</h1>\n  <p style=\"margin:4px 0 0;opacity:.8\">Window Service Request &amp; Estimate</p>\n</div>\n<h2>Customer Information</h2>\n<table>\n  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th></tr>\n  <tr><td>${esc(lead.name)}</td><td>${esc(lead.phone)}</td><td>${esc(lead.email)}</td><td>${esc(lead.address)}</td></tr>\n</table>\n<h2>Issue Description</h2>\n<p>${esc(lead.issue_description)}</p>\n<h2>Window Details (${uniqueWins.length} windows)</h2>\n<table>\n  <tr><th>#</th><th>Issue Type</th><th>Notes</th><th>Photo</th></tr>\n  ${rows}\n</table>\n<h2>AI Estimate</h2>\n<table>\n  <tr><th>#</th><th>Description</th><th>Base Price</th><th>Multiplier</th><th>Final Price</th><th>Notes</th></tr>\n  ${lineItemRows}\n  <tr><td colspan=\"4\" style=\"padding:8px;border:1px solid #ddd\"><b>Subtotal</b></td><td style=\"padding:8px;border:1px solid #ddd\"><b>$${estimate.subtotal}</b></td><td></td></tr>\n  <tr><td colspan=\"4\" style=\"padding:8px;border:1px solid #ddd\"><b>Tax (8.25%)</b></td><td style=\"padding:8px;border:1px solid #ddd\"><b>$${estimate.tax_amount}</b></td><td></td></tr>\n  <tr class=\"total-row\"><td colspan=\"4\" style=\"padding:8px\">TOTAL</td><td style=\"padding:8px\">$${estimate.total}</td><td></td></tr>\n</table>\n<p><i>${esc(estimate.customer_note)}</i></p>\n<div class=\"foot\">Generated by Apex Windows TX Automated System</div>\n</body></html>`;\n\nreturn [{ json: {\n  html_content: html,\n  lead_id: lead.id,\n  lead_name: lead.name,\n  lead_email: lead.email,\n  lead_phone: lead.phone,\n  lead_address: lead.address,\n  estimate_total: estimate.total,\n  estimate_id: $('Supabase - Save Estimate').first().json.id\n}}];"
+      },
+      "id": "bbada3c4-c7fb-4fa2-843e-79c8fb1aef38",
+      "name": "Code - Build PDF HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5968,
+        368
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdfshift.io/v3/convert/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Basic {{PDFSHIFT_BASIC_AUTH}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: $json.html_content, landscape: false, use_print: false, format: 'Letter', margin: { top: '15px', bottom: '15px', left: '15px', right: '15px' } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdf_binary"
+            }
+          }
+        }
+      },
+      "id": "1e0e49a9-db35-4724-832b-e75de2001c31",
+      "name": "HTTP Request - PDFShift",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6192,
+        368
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/storage/v1/object/service-pdfs/{{ $('Code - Build PDF HTML').first().json.lead_id }}_request.pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/pdf"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "pdf_binary",
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "5fd888f7-8383-4e46-b31a-f63ff7386f23",
+      "name": "HTTP Request - Upload PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6416,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "pdf_url",
+              "name": "pdf_url",
+              "value": "=https://{{SUPABASE_PROJECT_URL}}/storage/v1/object/public/service-pdfs/{{ $('Code - Build PDF HTML').first().json.lead_id }}_request.pdf",
+              "type": "string"
+            },
+            {
+              "id": "lead_id",
+              "name": "lead_id",
+              "value": "={{ $('Code - Build PDF HTML').first().json.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_name",
+              "name": "lead_name",
+              "value": "={{ $('Code - Build PDF HTML').first().json.lead_name }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_email",
+              "name": "lead_email",
+              "value": "={{ $('Code - Build PDF HTML').first().json.lead_email }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_phone",
+              "name": "lead_phone",
+              "value": "={{ $('Code - Build PDF HTML').first().json.lead_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "lead_address",
+              "name": "lead_address",
+              "value": "={{ $('Code - Build PDF HTML').first().json.lead_address }}",
+              "type": "string"
+            },
+            {
+              "id": "estimate_total",
+              "name": "estimate_total",
+              "value": "={{ $('Code - Build PDF HTML').first().json.estimate_total }}",
+              "type": "number"
+            },
+            {
+              "id": "estimate_id",
+              "name": "estimate_id",
+              "value": "={{ $('Code - Build PDF HTML').first().json.estimate_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3b5d1d1a-c64d-4a5a-8f54-84ef0e57c176",
+      "name": "Set - Build PDF URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        6640,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "service_request_pdf_url",
+              "fieldValue": "={{ $json.pdf_url }}"
+            }
+          ]
+        }
+      },
+      "id": "a9df10d8-b47b-443a-91ee-0bcfc5f7ef42",
+      "name": "Supabase - Save PDF URL",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6864,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "sales-manager@example.com",
+        "toEmail": "sales-manager@example.com",
+        "subject": "=Review Estimate: {{ $json.name }} — ${{ $('Set - Build PDF URL').first().json.estimate_total }}",
+        "html": "=<h2 style=\"color:#1565C0\">Estimate Ready for Review</h2>\n<table style=\"font-family:Arial;font-size:14px;\">\n  <tr><td><b>Name:</b></td><td>{{ $json.name }}</td></tr>\n  <tr><td><b>Phone:</b></td><td><a href=\"tel:{{ $json.phone }}\">{{ $json.phone }}</a></td></tr>\n  <tr><td><b>Email:</b></td><td>{{ $json.email }}</td></tr>\n  <tr><td><b>Address:</b></td><td>{{ $json.address }}</td></tr>\n</table>\n\n<h3>AI Estimate Line Items</h3>\n<table style=\"font-family:Arial;font-size:14px;border-collapse:collapse;width:100%\">\n  <tr style=\"background:#1565C0;color:#fff\">\n    <th style=\"padding:8px;border:1px solid #ddd\">Window</th>\n    <th style=\"padding:8px;border:1px solid #ddd\">Description</th>\n    <th style=\"padding:8px;border:1px solid #ddd\">Base</th>\n    <th style=\"padding:8px;border:1px solid #ddd\">Multiplier</th>\n    <th style=\"padding:8px;border:1px solid #ddd\">Final</th>\n    <th style=\"padding:8px;border:1px solid #ddd\">Notes</th>\n  </tr>\n  ={{ $('Code - Parse AI Response').first().json.estimate.line_items.map(i => `<tr><td style='padding:8px;border:1px solid #ddd'>#${i.window_number}</td><td style='padding:8px;border:1px solid #ddd'>${i.description}</td><td style='padding:8px;border:1px solid #ddd'>$${i.base_price}</td><td style='padding:8px;border:1px solid #ddd'>${i.multiplier}x</td><td style='padding:8px;border:1px solid #ddd'>$${i.final_price}</td><td style='padding:8px;border:1px solid #ddd'>${i.complexity_note}</td></tr>`).join('') }}\n  <tr style=\"background:#f5f5f5\">\n    <td colspan=\"4\" style=\"padding:8px;border:1px solid #ddd\"><b>Subtotal</b></td>\n    <td style=\"padding:8px;border:1px solid #ddd\"><b>${{ $('Set - Build PDF URL').first().json.estimate_total }}</b></td>\n    <td></td>\n  </tr>\n</table>\n\n<br>\n<p><b>Sales Manager Note:</b> {{ $('Code - Parse AI Response').first().json.estimate.sales_manager_note }}</p>\n<p><b>Service Request PDF:</b> <a href=\"{{ $('Set - Build PDF URL').first().json.pdf_url }}\">Download PDF</a></p>\n<br>\n<a href=\"https://apexwindowscrm.vercel.app/\" style=\"background:#1565C0;color:#fff;padding:14px 28px;text-decoration:none;border-radius:5px;font-size:16px;font-weight:bold;display:inline-block;\">REVIEW AND APPROVE QUOTE</a>\n<br><br>\n<p style=\"color:red;font-weight:bold;\">⚠️ This quote has NOT been sent to the customer. You must review and approve it in the CRM before it is sent.</p>",
+        "options": {}
+      },
+      "id": "15210ba3-ef22-40e0-896b-3e1f1b7cb964",
+      "name": "Send Email - Sales Manager Review Estimate",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        7088,
+        368
+      ],
+      "webhookId": "ba387928-8318-4154-8533-1c30e2ea7f66",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "sales-manager@example.com",
+        "toEmail": "={{ $('Set - Build PDF URL').first().json.lead_email }}",
+        "subject": "=Your Apex Windows TX Request Has Been Received",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Apex Windows TX</title>\n</head>\n<body style=\"margin:0;padding:20px;background:#f0f0f0;font-family:Arial,Helvetica,sans-serif;\">\n\n  <div style=\"max-width:620px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;\">\n\n    <!-- Header -->\n    <div style=\"background:#4A148C;padding:22px 28px;\">\n      <div style=\"font-size:21px;font-weight:bold;color:#ffffff;\">Apex Windows TX</div>\n      <div style=\"font-size:13px;color:#CE93D8;margin-top:5px;\">Window Service Experts — Dallas-Fort Worth</div>\n    </div>\n\n    <!-- Body -->\n    <div style=\"background:#fafafa;padding:24px 28px;\">\n\n      <h2 style=\"font-size:18px;color:#4A148C;margin:0 0 16px;\">Thank You, {{ $('Set - Build PDF URL').first().json.lead_name }}!</h2>\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:0 0 14px;\">We have received your window service request and our team is reviewing the details you provided.</p>\n\n      <!-- Info Banner -->\n      <div style=\"background:#E3F2FD;border:1px solid #1565C0;border-radius:6px;padding:12px 16px;margin:16px 0;\">\n        <span style=\"color:#1565C0;font-size:14px;font-weight:bold;\">&#8505; What happens next?</span>\n        <span style=\"color:#1565C0;font-size:14px;\"> — Our team will prepare your personalised quote and send it to you within <strong>1 business day</strong>.</span>\n      </div>\n\n      <!-- Details Table -->\n      <div style=\"border:1px solid #e8e0f5;border-radius:6px;margin:16px 0;overflow:hidden;\">\n        <table style=\"width:100%;border-collapse:collapse;font-size:14px;\">\n          <tr style=\"background:#f3e5f5;\">\n            <td style=\"padding:10px 12px;font-weight:600;color:#555;width:38%;border-bottom:1px solid #ede7f6;\">Response Time</td>\n            <td style=\"padding:10px 12px;color:#333;border-bottom:1px solid #ede7f6;\">Within 1 business day</td>\n          </tr>\n          <tr>\n            <td style=\"padding:10px 12px;font-weight:600;color:#555;width:38%;border-bottom:1px solid #ede7f6;\">Phone</td>\n            <td style=\"padding:10px 12px;border-bottom:1px solid #ede7f6;\"><a href=\"tel:2140000000\" style=\"color:#4A148C;font-weight:bold;text-decoration:none;\">(214) 000-0000</a></td>\n          </tr>\n          <tr style=\"background:#f3e5f5;\">\n            <td style=\"padding:10px 12px;font-weight:600;color:#555;width:38%;\">Website</td>\n            <td style=\"padding:10px 12px;\"><a href=\"https://apexwindowstx.com\" style=\"color:#4A148C;text-decoration:none;\">apexwindowstx.com</a></td>\n          </tr>\n        </table>\n      </div>\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:14px 0;\">If you have any questions in the meantime, please don't hesitate to call us — we're happy to help.</p>\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:14px 0;\">We look forward to serving you!</p>\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:14px 0 0;\">Warm regards,<br>\n      <strong>The Apex Windows TX Team</strong></p>\n\n    </div>\n\n    <!-- Footer -->\n    <div style=\"border-top:1px solid #e8e0f5;padding:13px 28px;background:#fafafa;text-align:center;\">\n      <p style=\"font-size:11px;color:#aaaaaa;margin:0;line-height:1.5;\">Apex Windows TX &bull; Dallas-Fort Worth, TX &bull; <a href=\"https://apexwindowstx.com\" style=\"color:#aaaaaa;\">apexwindowstx.com</a></p>\n    </div>\n\n  </div>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "84973e99-1e50-4e65-bb00-6502825e1e30",
+      "name": "Send Email - Customer Acknowledgement",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        7312,
+        368
+      ],
+      "webhookId": "3f2f9a52-1432-405a-8f8b-ef93ea644fb4",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://{{N8N_BASE_URL}}/webhook/quote-approval-ready",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lead_id: $('Set - Build PDF URL').first().json.lead_id, estimate_id: $('Set - Build PDF URL').first().json.estimate_id }) }}",
+        "options": {}
+      },
+      "id": "89b3162b-4478-4655-9750-701161109f2e",
+      "name": "HTTP POST - Trigger Workflow 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4992,
+        864
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Set - Build PDF URL').first().json.lead_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "workflow1_complete"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "=={{ JSON.stringify({ window_count: $('Supabase - Fetch All Windows2').all().length, estimate_total: $('Set - Build PDF URL').first().json.estimate_total, wf2_triggered: true }) }}"
+            }
+          ]
+        }
+      },
+      "id": "3f8183be-2ac9-480b-899e-387edd276fb6",
+      "name": "Supabase - Log Workflow 1 Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        7536,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "pricing_config",
+        "returnAll": true
+      },
+      "id": "b3081a9d-46cd-4b43-b1b0-119f67beac05",
+      "name": "Supabase - Fetch Pricing Config1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4624,
+        368
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "escalations",
+        "filterType": "string",
+        "filterString": "=lead_id=eq.{{ $json.id }}&resolved=is.false",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "type",
+              "fieldValue": "quote_approval_pending"
+            },
+            {
+              "fieldId": "due_at",
+              "fieldValue": "={{ new Date(Date.now() + 24*60*60*1000).toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "7b1f4397-651d-4a86-a8b9-a5cfdb954eec",
+      "name": "Supabase - Update Escalation1",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4176,
+        368
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/windows?lead_id=eq.' + $('Code - Validate File Sizes2').first().json.lead_id + '&order=created_at.asc&select=*' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{SUPABASE_JWT}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {}
+          }
+        }
+      },
+      "id": "5f4453e2-5bcb-4e86-b910-110e0db5baed",
+      "name": "Supabase - Fetch All Windows2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4400,
+        368
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "First Name",
+              "value": "={{ $json.body.name.split(' ')[0] }}"
+            },
+            {
+              "name": "Last Name",
+              "value": "={{ $json.body.name.split(' ').slice(1).join(' ') }}"
+            },
+            {
+              "name": "Email Address",
+              "value": "={{ $json.body.email }}"
+            },
+            {
+              "name": "Phone Number",
+              "value": "={{ $json.body.phone }}"
+            },
+            {
+              "name": "Street Address",
+              "value": "={{ $json.body.address.split(',')[0] }}"
+            },
+            {
+              "name": "City",
+              "value": "={{ $json.body.address.split(',')[1]?.trim() }}"
+            },
+            {
+              "name": "Describe Your Issue",
+              "value": "={{ ($json.body.issue_description || '').slice(0, 2000) }}"
+            }
+          ],
+          "number": [
+            {
+              "name": "Number of Windows",
+              "value": "={{ $json.body.num_windows }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2c44837c-51ee-40be-b746-de797ec3d110",
+      "name": "Set - Map Webhook to Form Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "apex-window-details-v2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b5031e16-10ae-410c-8ce3-8c491c04fc5d",
+      "name": "Webhook - Window Details",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        656
+      ],
+      "webhookId": "cda2b703-def5-4bec-a2fc-e7367601364c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify({\n  model: \"gpt-4o-mini\",\n  temperature: 0,\n  messages: [\n    {\n      role: \"system\",\n      content: \"You are a lead qualification system for Apex Windows TX, a window repair and replacement company in Dallas-Fort Worth TX. You MUST return valid JSON only. Copy ALL input fields EXACTLY as provided — do NOT interpret, modify, or infer any values.\"\n    },\n    {\n      role: \"user\",\n      content: `Qualify this lead and return structured JSON.\n\nINPUT:\n{\n  \"first_name\": \"${$json[\"First Name\"]}\",\n  \"last_name\": \"${$json[\"Last Name\"]}\",\n  \"email\": \"${$json[\"Email Address\"]}\",\n  \"phone\": \"${$json[\"Phone Number\"]}\",\n  \"street_address\": \"${$json[\"Street Address\"]}\",\n  \"city\": \"${$json[\"City\"]}\",\n  \"windows\": ${$json[\"Number of Windows\"]},\n  \"issue\": \"${$json[\"Describe Your Issue\"]}\"\n}\n\nRULES:\n- Copy \"issue\" EXACTLY from input — do NOT rewrite it\n- is_window_related = true if the issue clearly relates to window services (broken glass, foggy seals, condensation, cracked pane, window frames, replacement, repair, installation, etc.). Set false for any unrelated topic (cars, food, other businesses, gibberish, spam, test data).\n- valid = true if email contains @ AND phone is not empty AND windows >= 1 AND is_window_related = true\n- confidence = 90 if all fields present and valid, 60 if minor issues, 30 if suspicious or unrelated\n- reason = one line explaining the score\n\nOUTPUT (return ONLY this JSON, nothing else):\n{\n  \"valid\": true,\n  \"is_window_related\": true,\n  \"confidence\": 90,\n  \"reason\": \"All fields present and valid\",\n  \"lead\": {\n    \"first_name\": \"${$json[\"First Name\"]}\",\n    \"last_name\": \"${$json[\"Last Name\"]}\",\n    \"email\": \"${$json[\"Email Address\"]}\",\n    \"phone\": \"${$json[\"Phone Number\"]}\",\n    \"street_address\": \"${$json[\"Street Address\"]}\",\n    \"city\": \"${$json[\"City\"]}\",\n    \"issue\": \"${$json[\"Describe Your Issue\"]}\",\n    \"windows\": ${$json[\"Number of Windows\"]}\n  }\n}`\n    }\n  ]\n})\n}}",
+        "options": {}
+      },
+      "id": "67c9f98c-1ed8-477f-9ef5-dd79533c4e42",
+      "name": "AI - Lead Validation (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -80,
+        176
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "733f942e-033a-4922-bb77-f7c4236a1fa5",
+              "leftValue": "={{ JSON.parse($json.choices[0].message.content).valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "741d91e5-0361-4745-ae7a-c8342f53ab96",
+      "name": "IF - Valid Lead",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        144,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "AI validation failed"
+      },
+      "id": "fbad9a2b-5ac9-43b2-8784-3270ecb38edd",
+      "name": "Error - AI Validation Failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        464,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "lead_id",
+              "value": "={{ $json.lead_id }}"
+            },
+            {
+              "name": "window_1_photo_url",
+              "value": "={{ $json.windows[0]?.photo_url }}"
+            },
+            {
+              "name": "window_1_notes",
+              "value": "={{ $json.windows[0]?.notes }}"
+            },
+            {
+              "name": "window_1_issue_type",
+              "value": "={{ $json.windows[0]?.issue_type }}"
+            },
+            {
+              "name": "window_2_photo_url",
+              "value": "={{ $json.windows[1]?.photo_url }}"
+            },
+            {
+              "name": "window_2_notes",
+              "value": "={{ $json.windows[1]?.notes }}"
+            },
+            {
+              "name": "window_2_issue_type",
+              "value": "={{ $json.windows[1]?.issue_type }}"
+            },
+            {
+              "name": "window_3_photo_url",
+              "value": "={{ $json.windows[2]?.photo_url }}"
+            },
+            {
+              "name": "window_3_notes",
+              "value": "={{ $json.windows[2]?.notes }}"
+            },
+            {
+              "name": "window_3_issue_type",
+              "value": "={{ $json.windows[2]?.issue_type }}"
+            },
+            {
+              "name": "window_4_photo_url",
+              "value": "={{ $json.windows[3]?.photo_url }}"
+            },
+            {
+              "name": "window_4_notes",
+              "value": "={{ $json.windows[3]?.notes }}"
+            },
+            {
+              "name": "window_4_issue_type",
+              "value": "={{ $json.windows[3]?.issue_type }}"
+            },
+            {
+              "name": "window_5_photo_url",
+              "value": "={{ $json.windows[4]?.photo_url }}"
+            },
+            {
+              "name": "window_5_notes",
+              "value": "={{ $json.windows[4]?.notes }}"
+            },
+            {
+              "name": "window_5_issue_type",
+              "value": "={{ $json.windows[4]?.issue_type }}"
+            },
+            {
+              "name": "window_6_photo_url",
+              "value": "={{ $json.windows[5]?.photo_url }}"
+            },
+            {
+              "name": "window_6_notes",
+              "value": "={{ $json.windows[5]?.notes }}"
+            },
+            {
+              "name": "window_6_issue_type",
+              "value": "={{ $json.windows[5]?.issue_type }}"
+            },
+            {
+              "name": "window_7_photo_url",
+              "value": "={{ $json.windows[6]?.photo_url }}"
+            },
+            {
+              "name": "window_7_notes",
+              "value": "={{ $json.windows[6]?.notes }}"
+            },
+            {
+              "name": "window_7_issue_type",
+              "value": "={{ $json.windows[6]?.issue_type }}"
+            },
+            {
+              "name": "window_8_photo_url",
+              "value": "={{ $json.windows[7]?.photo_url }}"
+            },
+            {
+              "name": "window_8_notes",
+              "value": "={{ $json.windows[7]?.notes }}"
+            },
+            {
+              "name": "window_8_issue_type",
+              "value": "={{ $json.windows[7]?.issue_type }}"
+            },
+            {
+              "name": "window_9_photo_url",
+              "value": "={{ $json.windows[8]?.photo_url }}"
+            },
+            {
+              "name": "window_9_notes",
+              "value": "={{ $json.windows[8]?.notes }}"
+            },
+            {
+              "name": "window_9_issue_type",
+              "value": "={{ $json.windows[8]?.issue_type }}"
+            },
+            {
+              "name": "window_10_photo_url",
+              "value": "={{ $json.windows[9]?.photo_url }}"
+            },
+            {
+              "name": "window_10_notes",
+              "value": "={{ $json.windows[9]?.notes }}"
+            },
+            {
+              "name": "window_10_issue_type",
+              "value": "={{ $json.windows[9]?.issue_type }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "625b0111-45b9-4ed5-8cb4-15919db599d2",
+      "name": "Set - Map Window Form1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        3504,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ \"lead_id\": $('Lookup Lead by Email').first().json.id, \"status\": \"success\" }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2800,
+        1216
+      ],
+      "id": "22510e32-45dc-419a-87c5-1fdf35b134ab"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "apex-lead-v2",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "fc8066c8-69b0-4574-9650-7c867efea786",
+      "name": "Webhook - Lead Submitted",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1184,
+        80
+      ],
+      "webhookId": "8837036d-a726-4f11-b68a-4e0fa18f07c6"
+    },
+    {
+      "parameters": {
+        "fromEmail": "sales-manager@example.com",
+        "toEmail": "={{ $json.lead_email }}",
+        "subject": "=Form 2: HI {{ $json.lead_name }} Please provide your window details",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Apex Windows TX</title>\n</head>\n<body style=\"margin:0;padding:20px;background:#f0f0f0;font-family:Arial,Helvetica,sans-serif;\">\n\n  <div style=\"max-width:620px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;\">\n\n    <!-- Header -->\n    <div style=\"background:#4A148C;padding:22px 28px;\">\n      <div style=\"font-size:21px;font-weight:bold;color:#ffffff;\">Apex Windows TX</div>\n      <div style=\"font-size:13px;color:#CE93D8;margin-top:5px;\">Premium Window Installation &amp; Replacement</div>\n    </div>\n\n    <!-- Body -->\n    <div style=\"background:#fafafa;padding:24px 28px;\">\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:0 0 14px;\">Hi there,</p>\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:0 0 14px;\">Thank you for reaching out to <strong>Apex Windows TX</strong>! We have received your initial request.</p>\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:0 0 14px;\">To provide you with an accurate estimate, we need specific details for each of your windows (measurements, types, etc.). This helps us ensure the quote is exact and tailored to your needs.</p>\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:0 0 14px;\"><strong>Please click the button below to provide these details:</strong></p>\n\n      <!-- CTA Button -->\n      <div style=\"margin:28px 0;text-align:center;\">\n        <a href=\"https://windowdetails.vercel.app/\" style=\"display:inline-block;background:#2E7D32;color:#ffffff;text-decoration:none;padding:15px 30px;border-radius:6px;font-size:17px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;\">Submit Window Details</a>\n      </div>\n\n      <!-- Action Required Banner -->\n      <div style=\"background:#E8F5E9;border:1px solid #2E7D32;border-radius:6px;padding:12px 16px;margin:16px 0;\">\n        <span style=\"color:#2E7D32;font-size:14px;font-weight:bold;\">&#10003; Action Required</span>\n        <span style=\"color:#2E7D32;font-size:14px;\"> — Submit your window details to receive your personalised quote.</span>\n      </div>\n\n      <p style=\"font-size:13px;color:#666666;line-height:1.6;margin:14px 0;\"><em>If the button above doesn't work, copy and paste this link into your browser:</em><br>\n      <a href=\"https://windowdetails.vercel.app/\" style=\"color:#4A148C;\">https://windowdetails.vercel.app/</a></p>\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:14px 0;\">Once submitted, our team will review the information and send your quote shortly.</p>\n\n      <p style=\"font-size:14px;color:#444444;line-height:1.6;margin:14px 0 0;\">Best regards,<br>\n      <strong>The Apex Windows TX Team</strong></p>\n\n    </div>\n\n    <!-- Footer -->\n    <div style=\"border-top:1px solid #e8e0f5;padding:13px 28px;background:#fafafa;\">\n      <p style=\"font-size:11px;color:#aaaaaa;margin:0;line-height:1.5;\">Apex Windows TX Automation &bull; This email was sent because you submitted a window quote request. If you did not request this, please disregard.</p>\n    </div>\n\n  </div>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "22e69ac3-cbaa-41a3-8cea-7c79fc7d9ba9",
+      "name": "Send Email - Customer form 2",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1936,
+        144
+      ],
+      "webhookId": "3f2f9a52-1432-405a-8f8b-ef93ea644fb4",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAX_SIZE = 5 * 1024 * 1024;\nconst ALLOWED_MIMES = ['image/jpeg', 'image/jpg', 'image/png'];\nconst ALLOWED_EXTS = ['.jpg', '.jpeg', '.png'];\n\nconst webhookData = $('Webhook - Window Details').first();\nconst form = webhookData.json.body || webhookData.json;\nconst binary = webhookData.binary || {};\n\nlet lead_id = null;\ntry {\n  lead_id = $input.first().json.id || null;\n} catch (e) {\n  lead_id = null;\n}\n\nif (!lead_id) {\n  throw new Error('Could not find lead for email: ' + (form.email || 'unknown'));\n}\n\nconst redactPII = s => {\n  if (!s) return s;\n  return s\n    .replace(/\\b\\d{3}-\\d{2}-\\d{4}\\b/g, '[SSN REDACTED]')\n    .replace(/\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b/g, '[CC REDACTED]');\n};\n\nconst validatePhoto = (photoData, fileSize, label) => {\n  if (fileSize > MAX_SIZE) throw new Error(`${label} photo exceeds 5MB.`);\n  if (fileSize > 0) {\n    const mime = (photoData.mimeType || '').toLowerCase();\n    if (mime && !ALLOWED_MIMES.includes(mime)) {\n      throw new Error(`${label}: file type \"${mime}\" not allowed. Upload JPEG or PNG only.`);\n    }\n    const fname = (photoData.fileName || '').toLowerCase();\n    if (fname && !ALLOWED_EXTS.some(ext => fname.endsWith(ext))) {\n      throw new Error(`${label}: file extension not allowed. Upload JPEG or PNG only.`);\n    }\n  }\n};\n\nconst windows = [];\n\nif (form.windows_meta) {\n  let parsed;\n  try {\n    parsed = JSON.parse(form.windows_meta);\n  } catch (e) {\n    throw new Error('Invalid windows_meta JSON: ' + e.message);\n  }\n\n  for (const w of parsed) {\n    const photoKey = Object.keys(binary).find(key =>\n      key.toLowerCase().includes(`w${w.window_number}`)\n    ) || null;\n    const photoData = photoKey ? binary[photoKey] : null;\n    const fileSize = photoData ? parseInt(photoData.fileSize, 10) : 0;\n\n    validatePhoto(photoData || {}, fileSize, `Window ${w.window_number}`);\n\n    windows.push({\n      window_number: w.window_number,\n      issue_type: form.issue_type || form['Issue Type'] || 'Unknown',\n      other_description: form.other_description || form['Other Description (if Other selected above)'] || null,\n      notes: redactPII(w.notes || null),\n      photo_key: fileSize > 0 ? photoKey : null,\n      photo_filename: fileSize > 0 && photoData ? photoData.fileName : null\n    });\n  }\n}\n\nif (windows.length === 0) {\n  for (let i = 1; i <= 10; i++) {\n    const photoKey = Object.keys(binary).find(key =>\n      key.toLowerCase().includes(`w${i}`)\n    ) || null;\n    const notesKey = `Window ${i} — Notes (location, severity, any details)`;\n    const photoData = photoKey ? binary[photoKey] : null;\n    const fileSize = photoData ? parseInt(photoData.fileSize, 10) : 0;\n    const hasNotes = !!(form[notesKey] && form[notesKey].trim());\n\n    if (!fileSize && !hasNotes) continue;\n    validatePhoto(photoData || {}, fileSize, `Window ${i}`);\n\n    windows.push({\n      window_number: i,\n      issue_type: form['Issue Type'] || form.issue_type || 'Unknown',\n      other_description: form['Other Description (if Other selected above)'] || form.other_description || null,\n      notes: redactPII(form[notesKey] || null),\n      photo_key: fileSize > 0 ? photoKey : null,\n      photo_filename: fileSize > 0 && photoData ? photoData.fileName : null\n    });\n  }\n}\n\nif (windows.length === 0) {\n  throw new Error('No window details submitted.');\n}\n\nreturn [{\n  json: {\n    windows,\n    window_count: windows.length,\n    lead_id,\n    issue_type: form.issue_type || form['Issue Type'] || 'Unknown',\n    other_description: form.other_description || form['Other Description (if Other selected above)'] || null\n  },\n  binary\n}];"
+      },
+      "id": "1501e580-3088-4a0a-9676-8d032d9f9f07",
+      "name": "Code - Validate File Sizes2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'email=eq.' + $json.body.email }}"
+      },
+      "id": "60f64e93-bcaa-495a-8be8-f2077c260bcb",
+      "name": "Lookup Lead by Email",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        656
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://{{N8N_BASE_URL}}/webhook/new-lead",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"customer_name\": \"{{ $json.lead_name }}\",\n  \"customer_address\": \"{{ $json.lead_address }}\",\n  \"issue_description\": \"{{ $json.issue_clean }}\",\n  \"window_count\": {{ $('Code - Sanitise Fields').first().json.window_count }},\n  \"lead_id\": \"{{ $json.lead_id }}\",\n  \"phone_number\": \"{{ $json.lead_phone }}\",\n  \"email\": \"{{ $json.lead_email }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -352,
+        640
+      ],
+      "id": "53eb30dc-dfbf-4ae0-a887-ed3a22371e61",
+      "name": "HTTP Request1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_id_est",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dac34ddd-ec57-48c3-984c-1b9708cf3f43",
+      "name": "IF: OpenAI OK (Estimate)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5296,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.minimaxi.chat/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"MiniMax-Text-01\", temperature: 0, response_format: { type: \"json_object\" }, messages: [{ role: \"user\", content: $('Code - Build AI Prompt').first().json.prompt }] }) }}",
+        "options": {}
+      },
+      "id": "74c2a0c1-cc5a-448a-91e3-35e467ca0d5c",
+      "name": "MiniMax - Estimate Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5504,
+        512
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "MiniMax - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_id_val",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "dab5d40d-452d-46f9-93e3-31df3d8b494d",
+      "name": "IF: OpenAI OK (Validation)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        144,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.minimaxi.chat/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"MiniMax-Text-01\", temperature: 0, messages: [{ role: \"system\", content: \"You are a lead qualification system for Apex Windows TX. Return only valid JSON. Copy ALL input fields EXACTLY as provided.\" }, { role: \"user\", content: \"Qualify this lead and return structured JSON.\\n\\nINPUT:\\n{\\\"first_name\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"First Name\"] + \"\\\",\\\"last_name\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"Last Name\"] + \"\\\",\\\"email\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"Email Address\"] + \"\\\",\\\"phone\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"Phone Number\"] + \"\\\",\\\"street_address\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"Street Address\"] + \"\\\",\\\"city\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"City\"] + \"\\\",\\\"windows\\\":\" + $('IF - Validate Required Fields').first().json[\"Number of Windows\"] + \",\\\"issue\\\":\\\"\" + $('IF - Validate Required Fields').first().json[\"Describe Your Issue\"] + \"\\\"}\\n\\nRULES:\\n- is_window_related=true if issue relates to windows\\n- valid=true if email has @ AND phone not empty AND windows>=1 AND is_window_related\\n- confidence=90 if valid, 60 if minor issues, 30 if suspicious\\n\\nReturn ONLY this JSON, nothing else:\\n{\\\"valid\\\":true,\\\"is_window_related\\\":true,\\\"confidence\\\":90,\\\"reason\\\":\\\"\\\",\\\"lead\\\":{\\\"first_name\\\":\\\"\\\",\\\"last_name\\\":\\\"\\\",\\\"email\\\":\\\"\\\",\\\"phone\\\":\\\"\\\",\\\"street_address\\\":\\\"\\\",\\\"city\\\":\\\"\\\",\\\"issue\\\":\\\"\\\",\\\"windows\\\":1}}\" }] }) }}",
+        "options": {}
+      },
+      "id": "59ceeacc-593d-48df-8738-d40a736db1bc",
+      "name": "MiniMax - Validation Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        304
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "MiniMax - ApexWindows"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Supabase - Log Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Stop - Duplicate Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "AI - Lead Validation (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop - Missing Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Dedup Check": {
+      "main": [
+        [
+          {
+            "node": "IF - Is Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Is Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Log Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code - Sanitise Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Sanitise Fields": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Create Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Create Lead": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Log Lead Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Log Lead Created": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Create Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Create Escalation": {
+      "main": [
+        [
+          {
+            "node": "Set - Build Window Form URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Build Window Form URL": {
+      "main": [
+        [
+          {
+            "node": "Send Email - Sales Manager New Lead",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email - Customer form 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Split Windows Into Items": {
+      "main": [
+        [
+          {
+            "node": "If- Has Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If- Has Photo": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Upload Photo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set - Photo URL Null",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Upload Photo": {
+      "main": [
+        [
+          {
+            "node": "Set - Build Photo URL1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Photo URL Null": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Save Window Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Build Photo URL1": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Save Window Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Save Window Record": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Pipeline Window Details Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Pipeline Window Details Received": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Update Escalation1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Update Escalation": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Fetch All Windows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Fetch All Windows": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Fetch Pricing Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Build AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - OpenAI API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Save Estimate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Save Estimate": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Pipeline Estimate Generated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Pipeline Estimate Generated": {
+      "main": [
+        [
+          {
+            "node": "Code - Build PDF HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Build PDF HTML": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - PDFShift",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - PDFShift": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Upload PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Upload PDF": {
+      "main": [
+        [
+          {
+            "node": "Set - Build PDF URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Build PDF URL": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Save PDF URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Save PDF URL": {
+      "main": [
+        [
+          {
+            "node": "Send Email - Sales Manager Review Estimate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email - Sales Manager Review Estimate": {
+      "main": [
+        [
+          {
+            "node": "Send Email - Customer Acknowledgement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email - Customer Acknowledgement": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Log Workflow 1 Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Log Workflow 1 Complete": {
+      "main": [
+        [
+          {
+            "node": "HTTP POST - Trigger Workflow 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Update Escalation1": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Fetch All Windows2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Fetch Pricing Config1": {
+      "main": [
+        [
+          {
+            "node": "Code - Build AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase - Fetch All Windows2": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Fetch Pricing Config1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Map Webhook to Form Fields": {
+      "main": [
+        [
+          {
+            "node": "IF - Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Window Details": {
+      "main": [
+        [
+          {
+            "node": "Lookup Lead by Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Valid Lead": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Dedup Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - AI Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set - Map Window Form1": {
+      "main": [
+        [
+          {
+            "node": "Supabase - Save Window Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Lead Submitted": {
+      "main": [
+        [
+          {
+            "node": "Set - Map Webhook to Form Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Lead by Email": {
+      "main": [
+        [
+          {
+            "node": "Code - Validate File Sizes2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Validate File Sizes2": {
+      "main": [
+        [
+          {
+            "node": "Code - Split Windows Into Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - OpenAI API": {
+      "main": [
+        [
+          {
+            "node": "IF: OpenAI OK (Estimate)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: OpenAI OK (Estimate)": {
+      "main": [
+        [
+          {
+            "node": "Code - Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MiniMax - Estimate Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MiniMax - Estimate Fallback": {
+      "main": [
+        [
+          {
+            "node": "Code - Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI - Lead Validation (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "IF: OpenAI OK (Validation)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: OpenAI OK (Validation)": {
+      "main": [
+        [
+          {
+            "node": "IF - Valid Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MiniMax - Validation Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MiniMax - Validation Fallback": {
+      "main": [
+        [
+          {
+            "node": "IF - Valid Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

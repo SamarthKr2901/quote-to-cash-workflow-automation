@@ -1,0 +1,3057 @@
+{
+  "name": "Apex Workflow 3 - Post Call Processes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "post_call_webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -992,
+        1872
+      ],
+      "id": "6f12acef-87e9-4d50-a42a-5e5b32c13ec8",
+      "name": "post call webhook",
+      "webhookId": "8c751182-757d-41dc-a850-67e4c036050c"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update_form_status",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1552,
+        1200
+      ],
+      "id": "7f2098fb-4118-48ce-a57d-5f8750e1310c",
+      "name": "update_form_status",
+      "webhookId": "402fe20a-8163-4325-9b32-14bc25742dea"
+    },
+    {
+      "parameters": {
+        "sendTo": "=developer@example.com",
+        "subject": "=[TEST] pleas fill your incomplete form {{ $json.email }}",
+        "emailType": "text",
+        "message": "=Please fill your form and with all details propeley it will help us to make  proper quotetion here is the link below:\nhttps://apexleadflow.vercel.app/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        1264
+      ],
+      "id": "b97a2b99-c530-4c6c-8197-07b13ef89403",
+      "name": "Send a message",
+      "webhookId": "e43b8147-edd2-4333-ad58-3c5fe3303046",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('update_form_status').item.json.body.email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        1248
+      ],
+      "id": "84b57b31-e7e8-4a89-a67d-8e2b6895df97",
+      "name": "Get a row1",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+12603059676",
+        "to": "=+1{{ $('Get a row1').item.json.phone }}",
+        "message": "=Please fill your form and with all details propeley it will help us to make  proper quotetion here is the link below:\nhttps://windowdetails.vercel.app/",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        80,
+        1264
+      ],
+      "id": "1092a563-bc5f-4d08-a432-5e1f117122e4",
+      "name": "send link of form",
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================\n// FIXED: correct path is items[0].json.body.data\n// not items[0].json.data\n// ============================================\n\nconst body = items[0].json.body;\nconst data = body?.data;\n\n// Safety check\nif (!data) {\n  return [{ json: { error: 'No data found in webhook payload' } }];\n}\n\nconst transcript    = data.transcript || [];\nconst dynVars       = data.conversation_initiation_client_data\n                          ?.dynamic_variables || {};\nconst analysis      = data.analysis || {};\nconst metadata      = data.metadata || {};\n\n// ── Extract transfer tool data ──────────────────\nconst transferEntry = transcript.find(\n  t => t.tool_calls?.some(tc => tc.tool_name === 'transfer_to_number')\n);\n\nconst transferCall = transferEntry?.tool_calls?.find(\n  tc => tc.tool_name === 'transfer_to_number'\n);\n\nconst transferResultEntry = transcript.find(\n  t => t.tool_results?.some(tr => tr.tool_name === 'transfer_to_number')\n);\n\nconst transferResult = transferResultEntry?.tool_results?.find(\n  tr => tr.tool_name === 'transfer_to_number'\n);\n\n// Parse transfer params\nlet transferParams = {};\ntry {\n  transferParams = JSON.parse(transferCall?.params_as_json || '{}');\n} catch(e) {}\n\n// Parse transfer result\nlet transferResultParsed = {};\ntry {\n  transferResultParsed = JSON.parse(transferResult?.result_value || '{}');\n} catch(e) {}\n\nconst transferAttempted   = !!transferCall;\nconst transferFailed      = transferResult?.is_error === true;\nconst transferSucceeded   = transferAttempted && !transferFailed;\nconst transferError       = transferResultParsed?.error || '';\nconst transferredTo       = transferParams?.transfer_number || '';\nconst transferAgentMsg    = transferParams?.agent_message || '';\n\n// ── Extract other tool results ──────────────────\nconst formStatusEntry = transcript.find(\n  t => t.tool_calls?.some(tc => tc.tool_name === 'update_form_status')\n);\nconst formStatusCall = formStatusEntry?.tool_calls?.find(\n  tc => tc.tool_name === 'update_form_status'\n);\nlet formStatusParams = {};\ntry {\n  formStatusParams = JSON.parse(formStatusCall?.params_as_json || '{}');\n} catch(e) {}\n\n// ── Build clean output ──────────────────────────\nreturn [{\n  json: {\n\n    // ── Call basics ──\n    conversation_id:    data.conversation_id,\n    call_duration_secs: metadata.start_time_unix_secs\n                          ? (metadata.call_duration_secs || 0)\n                          : 0,\n    call_status:        analysis.call_successful,\n    call_summary:       analysis.transcript_summary,\n    termination_reason: metadata.termination_reason,\n\n    // ── Lead / customer data ──\n    lead_id:            dynVars.lead_uuid || dynVars.lead_id,\n    customer_name:      dynVars.customer_name,\n    customer_address:   dynVars.customer_address,\n    customer_phone:     dynVars['system__caller_id'] || null,\n    issue_description:  dynVars.issue_description,\n    window_count:       dynVars.window_count,\n\n    // ── Transfer data ──\n    transfer_attempted:  transferAttempted,\n    transfer_succeeded:  transferSucceeded,\n    transfer_failed:     transferFailed,\n    transfer_error:      transferError,\n    transferred_to:      transferredTo,\n    transfer_agent_msg:  transferAgentMsg,\n\n    // ── Form status ──\n    form_status:         formStatusParams.form_status || null,\n    form_confirmed:      formStatusParams.form_status === 'confirmed',\n\n    // ── Features used (from your data) ──\n    transfer_feature_used: metadata.features_usage?.transfer_to_number?.used || false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        1584
+      ],
+      "id": "f116a9b6-1199-4444-b452-74ae85e4b4d8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=call data: \n{{ $('post call webhook').item.json.body.data.analysis.call_successful }}\n{{ $('post call webhook').item.json.body.data.conversation_initiation_client_data.dynamic_variables.system__conversation_history }}\ncustomer address: {{ $json.customer_address }}",
+        "options": {
+          "systemMessage": "=You are a senior-level lead qualification engine for Apex Windows TX, a premium window repair and replacement company serving the Dallas–Fort Worth metroplex.\n\nYou think like a high-performing sales manager with extensive closing experience. You are analytical, conservative in scoring, and never overestimate lead quality.\n\nYour output is consumed directly by an automated AI pipeline. Therefore:\n- Output must be strictly machine-readable\n- No ambiguity, no assumptions without justification\n- Every field must be logically derived from the input\n\nReference prompt: :contentReference[oaicite:0]{index=0}\n\n--------------------------------------------------\nCORE OBJECTIVE\n--------------------------------------------------\n\nAnalyze a structured call summary and produce a complete, internally consistent JSON output representing lead quality, intent, and next actions.\n\nYou MUST:\n- Evaluate all signals (positive and negative)\n- Apply scoring rules precisely\n- Apply override rules AFTER scoring\n- Ensure all output fields align with each other\n\nNever leave fields blank. If data is missing, infer using the closest defensible logic.\n\n--------------------------------------------------\nBUSINESS CONTEXT\n--------------------------------------------------\n\nPRICING (Per Window):\n- Foggy glass (IGU): $150 – $300\n- Full replacement: $400 – $900\n- Repair: $80 – $200\n\nJOB SIZE:\n- 1–2 windows → low value\n- 3–4 windows → medium value\n- 5+ windows → high value\n- Full replacement always ranks higher than foggy glass at same count\n\nCONVERSION SIGNAL MULTIPLIERS:\n- Form submitted → strong positive signal\n- Human transfer requested → strong buying intent\n- Appointment requested → highest intent\n- Silent responses → low conversion\n- Budget sensitivity must be interpreted carefully (not always negative)\n\n--------------------------------------------------\nINPUT FORMAT\n--------------------------------------------------\n\nCALL SUMMARY:\n- Customer name\n- Issue described\n- Window count mentioned\n- Job type inferred\n- Address/location confirmed (yes/no)\n- Form submitted (yes/no/unknown)\n- Call transfer requested (yes/no)\n- Transfer outcome (succeeded/failed/not_attempted)\n- Budget signals\n- Engagement level\n- Call duration\n- Additional notes\n\nIf any field is unclear or missing:\n→ Infer logically from context\n→ Do NOT leave empty\n\n--------------------------------------------------\nREASONING PROCESS (INTERNAL — DO NOT OUTPUT)\n--------------------------------------------------\n\n1. Read full summary carefully\n2. Identify all signals (positive + negative)\n3. Apply scoring system completely\n4. Apply all override rules (strict order)\n5. Interpret budget signals correctly\n6. Derive all output fields\n7. Validate internal consistency across all fields\n8. Only then generate JSON\n\n--------------------------------------------------\nSCORING SYSTEM (0–120+)\n--------------------------------------------------\n\nApply ALL applicable signals.\n\nPOSITIVE SIGNALS:\n- 5+ windows: +30\n- 3–4 windows: +20\n- 1–2 windows: +10\n- Full replacement: +25\n- Foggy glass: +15\n- Repair: +8\n- Form submitted: +20\n- Human transfer requested: +15\n- Specific questions asked: +12\n- Active engagement: +10\n- Address confirmed: +8\n- Call > 90 sec: +8\n- Call 60–90 sec: +5\n- Budget ready: +10\n- Financing interest: +6\n- Appointment requested: +15\n- Polite tone: +5\n- Competitor mentioned: +4\n\nNEGATIVE SIGNALS:\n- Form not filled: -12\n- Vague problem: -15\n- Silent/unresponsive: -20\n- Busy/distracted: -25\n- Strong hesitation: -30\n- Sticker shock: -20\n- Weak resistance: -10\n- Not interested: -50\n- Wrong contact: -100\n\nNOTE:\n- Scores can exceed 100 or go negative\n- Do NOT clamp values\n\n--------------------------------------------------\nBUDGET INTERPRETATION\n--------------------------------------------------\n\nClassify into:\n- ready (+10)\n- flexible (+6)\n- price_sensitive (+4)\n- sticker_shock (-20)\n- none_detected\n\nAlways include explanation in:\nbudget_signal_detail\n\n--------------------------------------------------\nQUALIFICATION LOGIC\n--------------------------------------------------\n\nBASE STAGE:\n- 85+ → Hot Lead\n- 65–84 → Warm Lead\n- 40–64 → Cold Lead\n- 10–39 → Cold Lead\n- ≤9 → Not Interested\n\nOVERRIDES (STRICT ORDER):\n1. Wrong contact → Not Interested\n2. Transfer failed → Needs Callback\n3. Human requested → upgrade one stage (max: Hot)\n4. Appointment requested → Hot if score ≥ 50\n5. Form + strong engagement → upgrade if near boundary\n6. Sticker shock + disengagement → downgrade\n\n--------------------------------------------------\nFIELD RULES (STRICT)\n--------------------------------------------------\n\njob_size:\n- 5+ → large\n- 3–4 → medium\n- 1–2 → small\n\njob_type:\n- full_replacement | foggy_glass | repair | mixed\n\nestimated_revenue:\n- Calculate using window count × pricing range\n- If missing count:\n  small = 1.5\n  medium = 3.5\n  large = 7\n\ndeal_value_range:\n- large + full replacement → high_ticket\n- medium or large foggy → mid_ticket\n- small → low_ticket\n\ncustomer_intent:\n- strong | moderate | weak | none\n\nlead_temperature:\n- very_hot | hot | warm | cold\n\nconversion_probability:\nUse calibrated ranges:\n- Strong intent + form + 3+ windows → 70–85%\n- Engaged + no form → 45–60%\n- Small job → 25–40%\n- Weak → 10–25%\n- Not interested → 0–10%\n\nAdjust:\n- Budget ready → +10%\n- Sticker shock → -15%\n\nsales_readiness:\n- ready_now | needs_followup | nurture | disqualify\n\nfollow_up_urgency_hours:\n- Hot → 2\n- Warm → 12\n- Cold → 48\n- Needs Callback → 1\n- Not Interested → 168\n\n--------------------------------------------------\nFLAGS (STRICT LIST ONLY)\n--------------------------------------------------\n\nUse only:\nhigh_window_count, full_replacement_job, form_confirmed,\nform_not_filled, requested_human, transfer_failed,\ntransfer_succeeded, customer_unresponsive, wrong_contact,\ncustomer_busy, appointment_booked, large_job_value,\nneeds_immediate_callback, do_not_call, budget_ready,\nprice_sensitive, sticker_shock, competitor_mentioned,\nfinancing_interest\n\n--------------------------------------------------\nCONSISTENCY CHECK (MANDATORY)\n--------------------------------------------------\n\nEnsure ALL:\n- Score matches breakdown exactly\n- Stage matches score + overrides\n- CRM stage matches qualification stage\n- Priority matches stage\n- Callback logic is correct\n- Flags match signals\n- No invalid enum values\n- No contradictions\n\n--------------------------------------------------\nOUTPUT RULES (CRITICAL)\n--------------------------------------------------\n\n- Output ONLY raw JSON\n- No explanations\n- No markdown\n- No comments\n- Must pass JSON.parse()\n- No null values\n- Exact field names and casing required\n- Maintain exact field order\n\n--------------------------------------------------\nFINAL OUTPUT STRUCTURE\n--------------------------------------------------\n\n{\n\"lead_score\": 0,\n\"qualification_stage\": \"\",\n\"priority\": \"\",\n\"job_size\": \"\",\n\"job_type\": \"\",\n\"estimated_revenue\": \"\",\n\"deal_value_range\": \"\",\n\"customer_intent\": \"\",\n\"budget_signal\": \"\",\n\"budget_signal_detail\": \"\",\n\"lead_temperature\": \"\",\n\"conversion_probability\": 0,\n\"sales_readiness\": \"\",\n\"follow_up_urgency_hours\": 0,\n\"recommended_action\": \"\",\n\"call_transfer_requested\": false,\n\"call_transfer_status\": \"\",\n\"form_submitted\": \"\",\n\"score_breakdown\": {\n\"positive_signals\": [],\n\"negative_signals\": []\n},\n\"reasoning\": \"\",\n\"flags\": [],\n\"crm_stage\": \"\",\n\"sales_manager_note\": \"\",\n\"is_high_priority\": false,\n\"needs_callback\": false,\n\"callback_within_minutes\": 0\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -208,
+        1584
+      ],
+      "id": "5c8f7514-f413-4d63-bbd9-994c7c8393e4",
+      "name": "AI Agent",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.output || $json.text || $json.body || JSON.stringify($json);\n\nlet parsed = null;\ntry { parsed = JSON.parse(raw); } catch(e) {}\n\nif (!parsed) {\n  const s = String(raw).replace(/```(?:json)?\\s*/gi,'').replace(/```\\s*/g,'').trim();\n  try { parsed = JSON.parse(s); } catch(e) {}\n}\n\nif (!parsed) {\n  const m = String(raw).match(/\\{[\\s\\S]*\\}/);\n  if (m) try { parsed = JSON.parse(m[0]); } catch(e) {}\n}\n\nif (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {\n  throw new Error('AI parse failed. raw preview: ' + String(raw).substring(0, 300));\n}\n\nconst s = v => (v != null && v !== '') ? v : '';\nconst n = v => (typeof v === 'number' && !isNaN(v)) ? v : 0;\nconst b = v => v === true;\n\nreturn [{ json: {\n  lead_score:              n(parsed.lead_score),\n  qualification_stage:     s(parsed.qualification_stage),\n  priority:                s(parsed.priority),\n  job_size:                s(parsed.job_size),\n  job_type:                s(parsed.job_type),\n  estimated_revenue:       s(parsed.estimated_revenue),\n  deal_value_range:        s(parsed.deal_value_range),\n  customer_intent:         s(parsed.customer_intent),\n  budget_signal:           s(parsed.budget_signal),\n  budget_signal_detail:    s(parsed.budget_signal_detail),\n  lead_temperature:        s(parsed.lead_temperature),\n  conversion_probability:  n(parsed.conversion_probability),\n  sales_readiness:         s(parsed.sales_readiness),\n  follow_up_urgency_hours: n(parsed.follow_up_urgency_hours),\n  recommended_action:      s(parsed.recommended_action),\n  call_transfer_requested: b(parsed.call_transfer_requested),\n  call_transfer_status:    s(parsed.call_transfer_status),\n  form_submitted:          s(parsed.form_submitted),\n  score_breakdown:         parsed.score_breakdown || { positive_signals: [], negative_signals: [] },\n  reasoning:               s(parsed.reasoning),\n  flags:                   Array.isArray(parsed.flags) ? parsed.flags : [],\n  crm_stage:               s(parsed.crm_stage),\n  sales_manager_note:      s(parsed.sales_manager_note),\n  is_high_priority:        b(parsed.is_high_priority),\n  needs_callback:          b(parsed.needs_callback),\n  callback_within_minutes: n(parsed.callback_within_minutes)\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        1584
+      ],
+      "id": "aeaeab5b-7ee3-4000-8fe0-2fa05cb225dc",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "65d37564-1d78-46b2-a875-b826a1bce9c1",
+              "leftValue": "={{ $('Code in JavaScript1').item.json.call_transfer_requested }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        1584
+      ],
+      "id": "91ee79e3-9743-427a-9c7c-92efe0678952",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "sendTo": "=developer@example.com",
+        "subject": "=[TEST] Missed Lead transfer call {{ $json.email }}",
+        "emailType": "text",
+        "message": "=hi kelvin\nThis lead had request to ai agent to tranfer call to expert name:{{ $json.name }}\nand phone number:{{ $json.phone }} and reason {{ $json.voice_agent_notes }} please contact this lead. \nlead scoring:{{ $('Code in JavaScript1').item.json.lead_score }}\nPriority: {{ $('Code in JavaScript1').item.json.priority }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1168,
+        1568
+      ],
+      "id": "2b23cb0d-53d1-4654-8a4b-9c4afeab5e94",
+      "name": "send mail to expert",
+      "webhookId": "e43b8147-edd2-4333-ad58-3c5fe3303046",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $('Code in JavaScript').item.json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        368,
+        1584
+      ],
+      "id": "be648317-10fb-401f-bc0b-b13dc23c2c87",
+      "name": "Get a row2",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Voice Agent",
+              "fieldValue": "call"
+            },
+            {
+              "fieldId": "voice_agent_notes",
+              "fieldValue": "={{ $('post call webhook').item.json.body.data.analysis.transcript_summary }}"
+            },
+            {
+              "fieldId": "conversation_id",
+              "fieldValue": "={{ $('post call webhook').item.json.body.data.conversation_id }}"
+            },
+            {
+              "fieldId": "Lead_score",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.lead_score }}"
+            },
+            {
+              "fieldId": "lead_temp",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.lead_temperature }}"
+            },
+            {
+              "fieldId": "qualification_stage",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.qualification_stage }}"
+            },
+            {
+              "fieldId": "job size",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.job_size }}"
+            },
+            {
+              "fieldId": "job_type",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.job_type }}"
+            },
+            {
+              "fieldId": "customer_intent",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.customer_intent }}"
+            },
+            {
+              "fieldId": "recomonded_action",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.recommended_action }}"
+            },
+            {
+              "fieldId": "last_call_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "form_status",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.form_submitted }}"
+            },
+            {
+              "fieldId": "human_transfer_requested",
+              "fieldValue": "={{ $('Code in JavaScript1').item.json.call_transfer_status }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        576,
+        1584
+      ],
+      "id": "68e2d110-f31e-4cf6-882e-36f6c7a6beb4",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1f3e786f-5c1f-4e8f-9544-cc30afd2e99c",
+              "leftValue": "={{ $json.body?.data?.analysis?.transcript_summary || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -816,
+        1872
+      ],
+      "id": "e9202ff8-ec6a-470c-b31e-87225fa902c5",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "phone",
+              "keyValue": "={{ $json.body.data.metadata.body.Called.substring(3) }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        2016
+      ],
+      "id": "9dbbd405-8404-483b-8cfb-7a1ededaeb14",
+      "name": "Get Leads",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+1 2603059676",
+        "to": "={{ $json.phone }}",
+        "message": "=Hi {{ $json.name }},\nThis is Kelvin, from the APex we tried to reach you out but we failed we will \nreach you within 24 hours,you can also  call us with this number +1 2603059676",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        2016
+      ],
+      "id": "9b0bf575-553a-4a4c-b642-58a94b653640",
+      "name": "send sms",
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get Leads').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Voice Agent",
+              "fieldValue": "sms"
+            },
+            {
+              "fieldId": "sms_sent_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        2016
+      ],
+      "id": "65a083bd-3bec-4a68-952f-7ef4ba309df6",
+      "name": "update lead",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "gpt-4"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -288,
+        1808
+      ],
+      "id": "3f8a028b-6c6d-4e12-848a-70fddd1e22f6",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1Ld89Boi4SYry7psiQnQSsLN6JQ23L9MPzXMPIB9QDUk",
+          "mode": "list",
+          "cachedResultName": "Apex - Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Ld89Boi4SYry7psiQnQSsLN6JQ23L9MPzXMPIB9QDUk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Apex - Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $json.name }}",
+            "phone": "={{ $json.phone }}",
+            "email": "={{ $json.email }}",
+            "qualification_stage": "={{ $('Code in JavaScript1').item.json.qualification_stage }}",
+            "lead_score": "={{ $('Code in JavaScript1').item.json.lead_score }}",
+            "priority": "={{ $('Code in JavaScript1').item.json.priority }}",
+            "job_size": "={{ $('Code in JavaScript1').item.json.job_size }}",
+            "job_type": "={{ $('Code in JavaScript1').item.json.job_type }}",
+            "estimated_revenue": "={{ $('Code in JavaScript1').item.json.estimated_revenue }}",
+            "customer_intent": "={{ $('Code in JavaScript1').item.json.customer_intent }}",
+            "budget_signal": "={{ $('Code in JavaScript1').item.json.budget_signal }}",
+            "budget_detail": "={{ $('Code in JavaScript1').item.json.budget_signal_detail }}",
+            "lead_temperature": "={{ $('Code in JavaScript1').item.json.lead_temperature }}",
+            "conversion_probability": "={{ $('Code in JavaScript1').item.json.conversion_probability }}",
+            "follow_up_hours": "={{ $('Code in JavaScript1').item.json.follow_up_urgency_hours }}",
+            "reasoning": "={{ $('Code in JavaScript1').item.json.reasoning }}"
+          },
+          "matchingColumns": [
+            "name"
+          ],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pipe_line_stage",
+              "displayName": "pipe_line_stage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lead_score",
+              "displayName": "lead_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qualification_stage",
+              "displayName": "qualification_stage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_size",
+              "displayName": "job_size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_type",
+              "displayName": "job_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estimated_revenue",
+              "displayName": "estimated_revenue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_intent",
+              "displayName": "customer_intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget_signal",
+              "displayName": "budget_signal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "budget_detail",
+              "displayName": "budget_detail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lead_temperature",
+              "displayName": "lead_temperature",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "conversion_probability",
+              "displayName": "conversion_probability",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "follow_up_hours",
+              "displayName": "follow_up_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reasoning",
+              "displayName": "reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        592,
+        1776
+      ],
+      "id": "7358b348-5341-4df0-86a1-c687beaabee4",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+1 260 305 9676",
+        "to": "={{ $('If1').item.json.phone }}",
+        "message": "=hi {{ $('If1').item.json.name }},\nThank you for your time we will definetly give you best services.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        1568
+      ],
+      "id": "566d4ac3-489b-4479-beb0-f6a556f1fc45",
+      "name": "thank you",
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f371077d-7d97-49c5-ae6a-8b713902fe2f",
+              "leftValue": "={{ $json.form_submitted }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -848,
+        1200
+      ],
+      "id": "bbb6e162-d53d-4ef9-9536-7beaaefb547b",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('update_form_status').item.json.body.email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        992
+      ],
+      "id": "902dea66-2d95-41b5-a422-7f13571a752e",
+      "name": "Get a row3",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "form_status",
+              "fieldValue": "confirmed"
+            },
+            {
+              "fieldId": "form_confirmed",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        992
+      ],
+      "id": "b705752f-b31c-41fe-8ecb-344911562a72",
+      "name": "Update a row1",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get a row1').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "form_status",
+              "fieldValue": " not confimed"
+            },
+            {
+              "fieldId": "form_confirmed",
+              "fieldValue": "false"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        272,
+        1264
+      ],
+      "id": "3a355c3b-f1d5-47d1-8f21-38d7ccfb6a42",
+      "name": "Update a row2",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.call_attempts }}",
+              "value2": 7
+            }
+          ]
+        }
+      },
+      "id": "9fc93a8e-b987-4ee4-9958-cf1e9ad85633",
+      "name": "IF: Keep Retrying? (< 7 attempts)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        2592
+      ],
+      "notes": "TRUE = retry daily up to 7 attempts. FALSE = switch to weekly re-engagement after 7 days."
+    },
+    {
+      "parameters": {
+        "amount": 24
+      },
+      "id": "8043592f-f3b2-42f3-b400-c5c5a72726b3",
+      "name": "Wait: 24 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        2544
+      ],
+      "webhookId": "11c3dc66-554e-4035-ad8c-643d0ceb17fa",
+      "notes": "Pauses execution 24 hours before retry call attempt."
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = items[0].json;\nconst smsMessage = `Hi ${lead.customer_name}, Apex Windows TX here — following up on your window repair request. We have your quote ready and would love to connect.  we'll try calling again today If it is argent then call us now on +1 2603059676. — Apex Windows TX`;\nreturn [{ json: { ...lead, sms_message: smsMessage }}];"
+      },
+      "id": "d5a6bf75-be4d-451d-bd10-8dc564d5198a",
+      "name": "Code: Build Retry SMS (Day 2-7)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        2544
+      ]
+    },
+    {
+      "parameters": {
+        "from": "+1 2603059676",
+        "to": "={{ $json.phone }}",
+        "message": "={{ $json.sms_message }}",
+        "options": {}
+      },
+      "id": "3f8e7ece-e0e6-4632-b7d7-c41656061f8c",
+      "name": "Twilio: Send Retry SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        400,
+        2544
+      ],
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 7,
+        "unit": "days"
+      },
+      "id": "13e59ff5-c1b9-4f2a-82fc-428aa8fb617a",
+      "name": "Wait: 7 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        2720
+      ],
+      "webhookId": "46fc55ca-e3a6-4527-8c6b-13a277f605a6",
+      "notes": "After 7 failed daily attempts, switch to weekly cadence."
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = items[0].json;\nconst smsMessage = `Hi ${lead.customer_name}, Apex Windows TX checking in on your window repair request. We'd still love to help — call us now on +1 2603059676 we arealways at your service. — Apex Windows TX`;\nreturn [{ json: { ...lead, sms_message: smsMessage }}];"
+      },
+      "id": "596568b2-ce47-4507-91c9-ffb5fe5c75df",
+      "name": "Code: Build Weekly Re-engagement SMS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        2720
+      ]
+    },
+    {
+      "parameters": {
+        "from": "+1 2603059676",
+        "to": "={{ $json.phone }}",
+        "message": "={{ $json.sms_message }}",
+        "options": {}
+      },
+      "id": "e98ded74-6727-47c1-871f-64b8dceeb840",
+      "name": "Twilio: Send Weekly Re-engagement",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        400,
+        2720
+      ],
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "7d4ed63d-ef63-404b-b09b-ac5698f27ea6",
+      "name": "Cron: Daily 8am CT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        3120
+      ],
+      "notes": "Fires every day at 8:00am Central Time. IMPORTANT: Set your n8n instance timezone or use America/Chicago here."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ \n  $json.appointment_date === \n  new Date(Date.now() + 86400000).toISOString().split('T')[0]\n}}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "fa581440-72a7-4b89-b6b1-47fdd4b3c314",
+      "name": "IF: Any Appointments Tomorrow?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        3120
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "2de03468-d304-494f-8ec2-55b2a9f87293",
+      "name": "Split in Batches (1 at a time)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        0,
+        3008
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const appt = items[0].json;\n\n// Format time: '14:00' → '2:00 PM'\nconst [h, m] = (appt.appointment_time || '00:00').split(':');\nconst hour = parseInt(h);\nconst ampm = hour >= 12 ? 'PM' : 'AM';\nconst hour12 = hour % 12 || 12;\nconst timeFormatted = `${hour12}:${m} ${ampm}`;\n\n// Format date: '2026-04-20' → 'Monday, April 20th'\nconst dateObj = new Date(appt.appointment_date + 'T12:00:00');\nconst dateFormatted = dateObj.toLocaleDateString('en-US', {\n  weekday: 'long',\n  month: 'long',\n  day: 'numeric'\n});\n\nconst smsMessage = `Hi ${appt.client_name}, just a reminder that your Apex Windows free estimate visit is tomorrow — ${dateFormatted} at ${timeFormatted} at ${appt.client_address}. Our team is looking forward to seeing you! Questions? Reply here. — Apex Windows TX`;\n\nreturn [{ json: {\n  ...appt,\n  customer_phone: appt.client_phone,\n  sms_message: smsMessage,\n  time_formatted: timeFormatted,\n  date_formatted: dateFormatted\n}}];"
+      },
+      "id": "62090844-03d2-4cf3-952f-96807b5be149",
+      "name": "Code: Format Time & Build Reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        3008
+      ],
+      "notes": "Converts 24hr time (14:00) to 12hr (2:00 PM) and formats date as 'Monday, April 20'."
+    },
+    {
+      "parameters": {
+        "from": "+1 2603059676",
+        "to": "={{ $json.client_phone }}",
+        "message": "={{ $json.sms_message }} {{ $json.customer_phone }}",
+        "options": {}
+      },
+      "id": "ca7ee152-bd1b-40ae-83b6-16da27e395fa",
+      "name": "Twilio: Send 24hr Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        448,
+        3008
+      ],
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      },
+      "notes": "IMPORTANT: Change +12145550100 to your actual Twilio number."
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "appointments",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "appointment_date",
+              "condition": "eq",
+              "keyValue": "={{ new Date(Date.now() + 86400000).toISOString().split('T')[0] }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        3120
+      ],
+      "id": "b58460f6-94f3-4593-8b46-04caadfe2825",
+      "name": "Get many rows",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "appointments",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Split in Batches (1 at a time)').item.json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "reminder_24hr_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        656,
+        3008
+      ],
+      "id": "34ac935e-f358-45a6-9d4e-7adea2070ebf",
+      "name": "Update a row3",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "b455bb66-4191-4dd7-9022-fc22f3261d1f",
+      "name": "Cron: Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -816,
+        3568
+      ],
+      "notes": "Runs every 30 minutes. Timezone: America/Chicago (Central Time)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// FILTER APPOINTMENTS WITHIN NEXT 2 HOURS (FROM CURRENT TIME IST)\n// ============================================================\n\n// 👉 Current time (IST safe)\nconst now = new Date();\n\n// 👉 Add 2 hours\nconst twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);\n\n// Helper to normalize time (handles \"09:00\" & \"09:00:00\")\nfunction normalizeTime(t) {\n  return t.length === 5 ? t + \":00\" : t;\n}\n\n// ============================================================\n// FILTER LOGIC\n// ============================================================\n\nconst filtered = items.filter(item => {\n  const appt = item.json;\n\n  if (!appt.appointment_date || !appt.appointment_time) return false;\n\n  // 👉 Create datetime in IST\n  const apptDateTime = new Date(\n    `${appt.appointment_date}T${normalizeTime(appt.appointment_time)}+05:30`\n  );\n\n  if (isNaN(apptDateTime.getTime())) return false;\n\n  return (\n    apptDateTime.getTime() >= now.getTime() &&\n    apptDateTime.getTime() <= twoHoursLater.getTime()\n  );\n});\n\n// ============================================================\n// REMOVE DUPLICATES\n// ============================================================\n\nconst unique = [];\nconst seen = new Set();\n\nfor (const item of filtered) {\n  const key = item.json.appointment_date + item.json.appointment_time;\n  if (!seen.has(key)) {\n    seen.add(key);\n    unique.push(item);\n  }\n}\n\n// ============================================================\n// OUTPUT\n// ============================================================\n\nif (unique.length === 0) {\n  return [{\n    json: {\n      skip: true,\n      message: \"No appointments in next 2 hours\",\n      current_time: now.toLocaleString(\"en-IN\", { timeZone: \"Asia/Kolkata\" }),\n      window_end: twoHoursLater.toLocaleString(\"en-IN\", { timeZone: \"Asia/Kolkata\" })\n    }\n  }];\n}\n\nreturn unique;"
+      },
+      "id": "4fad6375-602c-4ddf-9830-9c137c3fd6e5",
+      "name": "Code: Filter Appointments in 2hr Window",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        3568
+      ],
+      "notes": "Supabase REST can't filter on time columns directly. This code filters to appointments starting in the next 0-120 minutes."
+    },
+    {
+      "parameters": {
+        "jsCode": "const appt = items[0].json;\n\n// Format time: '14:00' → '2:00 PM'\nconst [h, m] = (appt.appointment_time || '00:00').split(':');\nconst hour = parseInt(h);\nconst ampm = hour >= 12 ? 'PM' : 'AM';\nconst hour12 = hour % 12 || 12;\nconst timeFormatted = `${hour12}:${m} ${ampm}`;\n\nconst smsMessage = `Hi ${appt.client_name}, your Apex Windows estimate visit is in about 2 hours at ${timeFormatted} — we'll see you at ${appt.client_address} soon! — Apex Windows TX`;\n\nreturn [{ json: {\n  ...appt,\n  customer_phone: appt.client_phone,\n  sms_message: smsMessage,\n  time_formatted: timeFormatted\n}}];"
+      },
+      "id": "875989c5-2bc2-42e0-845b-0b9bcf1d4ff0",
+      "name": "Code: Build 2hr Reminder Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        3456
+      ]
+    },
+    {
+      "parameters": {
+        "from": "+1 2603059676",
+        "to": "={{ $json.client_phone }}",
+        "message": "={{ $json.sms_message }}",
+        "options": {}
+      },
+      "id": "6c9a9fe8-06c2-40ae-ac91-7dc4bc5e6c9d",
+      "name": "Twilio: Send 2hr Reminder",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        576,
+        3456
+      ],
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      },
+      "notes": "IMPORTANT: Change +12145550100 to your actual Twilio number."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "13e18a15-6ae0-422d-bd3c-9951f7bc3077",
+      "name": "Split in Batches (1 at a time)1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        128,
+        3456
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "appointments",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "appointment_date",
+              "condition": "eq",
+              "keyValue": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "scheduled"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        3568
+      ],
+      "id": "1d837d81-f996-4e61-aa49-c3431eba358a",
+      "name": "Get many rows1",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4f5a94b3-bdf8-4e5a-bc61-f1046900888b",
+              "leftValue": "={{ $json.reminder_2hr_sent }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -160,
+        3568
+      ],
+      "id": "803bbe4f-c486-4500-89bf-ef76f2f833a5",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "appointments",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Split in Batches (1 at a time)1').item.json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "reminder_2hr_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        3456
+      ],
+      "id": "45132c9b-3f79-42f4-b181-6feee75cadaa",
+      "name": "Update a row4",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "BookAppointment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -832,
+        64
+      ],
+      "id": "dd2442af-b901-47e9-b5b2-f8abbffad040",
+      "name": "Book Appointment Webhook",
+      "webhookId": "8c751182-757d-41dc-a850-67e4c036050c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// PARSE & VALIDATE - Book Appointment (FIXED)\n// ============================================================\n\n// Safe body extraction\nconst body = $input.item.json.body ?? $input.item.json ?? {};\n\n// Extract fields safely\nconst lead_id          = (body.lead_id ?? '').toString().trim();\nlet appointment_date = (body.appointment_date ?? '').toString().trim();\nconst appointment_time = (body.appointment_time ?? '').toString().trim();\nconst service_type     = (body.service_type ?? 'Quote Review Call').toString().trim();\nconst notes            = (body.notes ?? '').toString().trim();\nconst customer_name    = (body.customer_name ?? '').toString().trim();\nconst customer_email   = (body.email ?? '').toString().trim();\nconst customer_phone   = (body.customer_phone ?? '').toString().trim();\nconst customer_address = (body.customer_address ?? '').toString().trim();\n\n// ============================================================\n// VALIDATION (ONLY REQUIRED FIELDS)\n// ============================================================\n\nconst missing = [];\n\nif (!appointment_date)  missing.push('appointment_date');\nif (!appointment_time)  missing.push('appointment_time');\nif (!customer_email)    missing.push('customer_email');\n\n// Past-date validation — auto-correct year if LLM used wrong year (e.g. 2024 instead of 2026)\nconst today = new Date().toISOString().split('T')[0];\nif (appointment_date && appointment_date < today) {\n  const dateParts = appointment_date.split('-');\n  const currentYear = new Date().getFullYear();\n  const sameMonthDay = `${currentYear}-${dateParts[1]}-${dateParts[2]}`;\n  if (sameMonthDay >= today) {\n    appointment_date = sameMonthDay;\n  } else {\n    const nextYearDate = `${currentYear + 1}-${dateParts[1]}-${dateParts[2]}`;\n    if (nextYearDate >= today) {\n      appointment_date = nextYearDate;\n    } else {\n      return [{ json: { valid: false, error: 'Appointment date cannot be in the past.', missing_fields: [], received: body } }];\n    }\n  }\n}\n\nif (missing.length > 0) {\n  return [\n    {\n      json: {\n        valid: false,\n        error: 'Missing required fields: ' + missing.join(', '),\n        missing_fields: missing,\n        received: body\n      }\n    }\n  ];\n}\n\n// ============================================================\n// TIME PROCESSING\n// ============================================================\n\n// Build ISO start\nconst startISO = `${appointment_date}T${appointment_time}:00`;\n\n// Safe time split\nlet endISO = startISO;\n\nif (appointment_time.includes(':')) {\n  const [h, m] = appointment_time.split(':').map(Number);\n\n  if (!isNaN(h) && !isNaN(m)) {\n    const endHour = String(h + 1).padStart(2, '0');\n    endISO = `${appointment_date}T${endHour}:${String(m).padStart(2,'0')}:00`;\n  }\n}\n\n// ============================================================\n// SERVICE LABEL NORMALIZATION\n// ============================================================\n\nlet serviceLabel = 'Quote Review Call';\n\nif (service_type === 'On-Site Estimate') {\n  serviceLabel = 'On-Site Estimate';\n} else if (service_type === 'Callback - Scheduling') {\n  serviceLabel = 'Callback - Scheduling';\n} else if (service_type) {\n  serviceLabel = service_type;\n}\n\nconst serviceTypeDb = serviceLabel === 'Quote Review Call' ? 'quote_review_call' : (serviceLabel === 'Installation' ? 'installation' : 'estimating');\n\n// ============================================================\n// FINAL OUTPUT\n// ============================================================\n\nreturn [\n  {\n    json: {\n      valid: true,\n\n      // Core fields\n      lead_id,\n      appointment_date,\n      appointment_time,\n      customer_email,\n\n      // Optional fields\n      service_type: serviceLabel,\n      service_type_db: serviceTypeDb,\n      notes,\n      customer_name,\n      customer_phone,\n      customer_address,\n\n      // Time\n      startISO,\n      endISO,\n\n      // Calendar\n      calendar_summary: `Apex Windows - ${serviceLabel} - ${customer_name || customer_email}`,\n      calendar_description:\n        `Lead ID: ${lead_id || 'N/A'}\\n` +\n        `Service: ${serviceLabel}\\n` +\n        `Email: ${customer_email}\\n` +\n        `Phone: ${customer_phone}\\n` +\n        `Address: ${customer_address}\\n` +\n        `Notes: ${notes}`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        64
+      ],
+      "id": "00ee4522-fd21-4c39-a4f5-6146726ef1e5",
+      "name": "Parse & Validate Booking"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1776770164603-4kqgf93xy"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -320,
+        64
+      ],
+      "id": "814f18af-6905-4bd8-8fb9-5fa466b4486b",
+      "name": "Booking Valid?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// MERGE — works when Code node sits directly after Calendar node\n// $input.first().json = Google Calendar event output\n// ============================================================\n\nconst cal = $input.first().json;\n\nconst safe = (val) =>\n  (val !== null && val !== undefined && val !== '')\n    ? String(val).trim()\n    : '';\n\n// ── Calendar fields — all confirmed present in your output ──\nconst event_id     = safe(cal?.id);\nconst booking_link = safe(cal?.htmlLink);\nconst cal_status   = safe(cal?.status);\nconst cal_summary  = safe(cal?.summary);\nconst rawStart     = cal?.start?.dateTime || '';\n\n// ── Parse date/time from ISO string \"2026-04-18T00:30:00+05:30\" ──\nlet appointment_date = '';\nlet appointment_time = '';\n\nif (rawStart) {\n  // Strip the timezone offset and parse directly\n  const stripped = rawStart.replace(/([+-]\\d{2}:\\d{2}|Z)$/, '');\n  const dt = new Date(stripped);\n  const yyyy = dt.getFullYear();\n  const mm   = String(dt.getMonth() + 1).padStart(2, '0');\n  const dd   = String(dt.getDate()).padStart(2, '0');\n  const hh   = String(dt.getHours()).padStart(2, '0');\n  const min  = String(dt.getMinutes()).padStart(2, '0');\n  appointment_date = `${yyyy}-${mm}-${dd}`;\n  appointment_time = `${hh}:${min}`;\n}\n\n// ── Get booking data from the webhook trigger node ──\n// Parse & Validate Booking is the webhook — always accessible\nconst parsed = $('Parse & Validate Booking').first().json;\n\nconst lead_id        = safe(parsed?.lead_id);\nconst client_name    = safe(parsed?.customer_name);\nconst client_email   = safe(parsed?.customer_email);\nconst client_phone   = safe(parsed?.customer_phone);\nconst client_address = safe(parsed?.customer_address);\nconst service_type   = safe(parsed?.service_type);\nconst notes          = safe(parsed?.notes);\nconst final_date     = safe(parsed?.appointment_date) || appointment_date;\nconst final_time     = safe(parsed?.appointment_time) || appointment_time;\n\n// ── Debug dump so you can see exactly what arrived ──\n// Remove after confirmed working\nconst debug = {\n  cal_keys:    Object.keys(cal || {}),\n  parsed_keys: Object.keys(parsed || {}),\n  rawStart,\n  lead_id,\n  client_email\n};\n\nif (!client_email) {\n  throw new Error(\n    `No email found. parsed keys: ${debug.parsed_keys.join(', ')} | ` +\n    `lead_id: \"${lead_id}\" | rawStart: \"${rawStart}\"`\n  );\n}\n\nreturn [{\n  json: {\n    client_email,\n    client_phone,\n    service_type,\n    service_type_db: safe(parsed?.service_type_db) || 'estimating',\n    notes,\n    appointment_date: final_date,\n    appointment_time: final_time,\n    event_id,\n    booking_link,\n    cal_status,\n    cal_summary,\n    booked_at:  new Date().toISOString(),\n    timezone:   cal?.start?.timeZone || 'America/New_York',\n    _debug:     debug\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        0
+      ],
+      "id": "93637ff1-b112-4c35-b702-2c264652d879",
+      "name": "Merge Booking Data"
+    },
+    {
+      "parameters": {
+        "tableId": "appointments",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "client_name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "fieldId": "client_email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "client_phone",
+              "fieldValue": "={{ $json.phone }}"
+            },
+            {
+              "fieldId": "client_address",
+              "fieldValue": "={{ $json.address }}"
+            },
+            {
+              "fieldId": "service_type",
+              "fieldValue": "={{ $('Merge Booking Data').item.json.service_type_db }}"
+            },
+            {
+              "fieldId": "requirement",
+              "fieldValue": "={{ $('Merge Booking Data').item.json.cal_summary }}"
+            },
+            {
+              "fieldId": "appointment_date",
+              "fieldValue": "={{ $('Merge Booking Data').item.json.appointment_date }}"
+            },
+            {
+              "fieldId": "appointment_time",
+              "fieldValue": "={{ $('Merge Booking Data').item.json.appointment_time }}"
+            },
+            {
+              "fieldId": "booked_at",
+              "fieldValue": "={{ $('Merge Booking Data').item.json.booked_at }}"
+            },
+            {
+              "fieldId": "notes",
+              "fieldValue": "={{ $('Merge Booking Data').item.json.notes || null }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "scheduled"
+            },
+            {
+              "fieldId": "booked_by",
+              "fieldValue": "voice_agent"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        0
+      ],
+      "id": "b0e75a6e-20b3-48c7-be24-3f64ec56bcac",
+      "name": "Save Appointment to Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Merge Booking Data').item.json.client_email }}",
+        "subject": "=Your Apex Windows Appointment is Confirmed!",
+        "message": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Appointment Confirmed - Apex Windows TX</title>\n<style>\n  body { margin:0; padding:0; background:#f0f4f8; font-family:Arial,sans-serif; }\n  .wrap { max-width:600px; margin:30px auto; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08); }\n  .header { background:#1a7a3c; padding:28px 32px; text-align:center; }\n  .header h1 { color:#fff; margin:0; font-size:22px; letter-spacing:0.5px; }\n  .header p  { color:#c8f0d8; margin:6px 0 0; font-size:13px; }\n  .body { padding:28px 32px; color:#333; font-size:15px; line-height:1.7; }\n  .detail-card { background:#f7faf8; border:1px solid #d4edda; border-radius:8px; padding:18px 22px; margin:20px 0; }\n  .detail-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #e8f0ea; }\n  .detail-row:last-child { border-bottom:none; }\n  .detail-label { color:#666; font-size:13px; font-weight:bold; min-width:120px; }\n  .detail-value { color:#222; font-size:13px; text-align:right; }\n  .cta { text-align:center; margin:24px 0 8px; }\n  .cta a { background:#1a7a3c; color:#fff !important; padding:13px 28px; border-radius:6px; text-decoration:none; font-size:14px; font-weight:bold; display:inline-block; }\n  .footer { background:#f7f7f7; padding:16px 32px; text-align:center; font-size:12px; color:#888; border-top:1px solid #eee; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n  <div class=\"header\">\n    <h1>Apex Windows TX</h1>\n    <p>Window Repair &amp; Replacement — Dallas-Fort Worth</p>\n  </div>\n  <div class=\"body\">\n    <p>Hi <strong>{{ $('Merge Booking Data').item.json.client_name || 'there' }}</strong>,</p>\n    <p>Your appointment has been confirmed. Here are your details:</p>\n    <div class=\"detail-card\">\n      <div class=\"detail-row\"><span class=\"detail-label\">Service</span><span class=\"detail-value\">{{ $('Merge Booking Data').item.json.service_type }}</span></div>\n      <div class=\"detail-row\"><span class=\"detail-label\">Date</span><span class=\"detail-value\">{{ $('Merge Booking Data').item.json.appointment_date }}</span></div>\n      <div class=\"detail-row\"><span class=\"detail-label\">Time</span><span class=\"detail-value\">{{ $('Merge Booking Data').item.json.appointment_time }}</span></div>\n      <div class=\"detail-row\"><span class=\"detail-label\">Address</span><span class=\"detail-value\">{{ $json.client_address }}</span></div>\n      {{ $('Merge Booking Data').item.json.notes ? '<div class=\"detail-row\"><span class=\"detail-label\">Notes</span><span class=\"detail-value\">' + $('Merge Booking Data').item.json.notes + '</span></div>' : '' }}\n    </div>\n    <div class=\"cta\">\n      <a href=\"{{ $('Merge Booking Data').item.json.booking_link }}\">View Appointment in Calendar</a>\n    </div>\n    <p style=\"font-size:12px;color:#999;text-align:center;\">Or copy this link: {{ $('Merge Booking Data').item.json.booking_link }}</p>\n    <p>If you need to reschedule or have any questions, reply to this email or call us directly.</p>\n    <p>Thank you for choosing <strong>Apex Windows TX</strong>!</p>\n    <p style=\"margin-top:20px;\">Best regards,<br><strong>The Apex Windows TX Team</strong><br>apexwindowstx.com</p>\n  </div>\n  <div class=\"footer\">© 2026 Apex Windows TX · Dallas-Fort Worth · Window Repair &amp; Replacement</div>\n</div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1488,
+        0
+      ],
+      "id": "7f71fb2e-5cc0-4a32-b7f3-d3c07275e59c",
+      "name": "Send Confirmation Email",
+      "webhookId": "70474d4e-8fea-4bb8-9ed0-19d431d16d1a",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build success response for ElevenLabs / calling agent\nconst d = $('Merge Booking Data').item.json;\nconst name = $('Parse & Validate Booking').item.json.customer_name || 'customer';\n\nreturn [{\n  json: {\n    success: true,\n    message: `Appointment booked for ${name} on ${d.appointment_date} at ${d.appointment_time}`,\n    appointment_date: d.appointment_date,\n    appointment_time: d.appointment_time,\n    service_type:     d.service_type,\n    booking_link:     d.booking_link,\n    email_sent:       true\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        0
+      ],
+      "id": "df08bf3f-e0f9-49fb-b997-180bbfa726f1",
+      "name": "Build Booking Response"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- ERROR RESPONSE BUILDER ----\nconst err = $input.item.json;\nreturn [{\n  json: {\n    success: false,\n    error: err.error || 'Validation failed',\n    missing_fields: err.missing_fields || [],\n    received: err.received || {}\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        176
+      ],
+      "id": "e2b74e8d-b3b0-402f-8488-be3b8754b66f",
+      "name": "Booking Error Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1968,
+        0
+      ],
+      "id": "3e2e474b-0678-449f-ab7b-b4a428ac1ea4",
+      "name": "Respond - Booking Success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        160,
+        176
+      ],
+      "id": "92897d59-8a62-4a12-a082-7e231ea64582",
+      "name": "Respond - Booking Error"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2dd49e09-d17b-4a3d-8c85-09d0da61ee37",
+              "name": "appointment_date",
+              "value": "={{ $json.appointment_date }}",
+              "type": "string"
+            },
+            {
+              "id": "baa662d5-c8b3-4481-b673-cc86f8ae8598",
+              "name": "appointment_time",
+              "value": "={{ $json.appointment_time }}",
+              "type": "string"
+            },
+            {
+              "id": "d4ad05f4-9c63-474e-b7eb-289c6cf179e4",
+              "name": "customer_email",
+              "value": "={{ $json.customer_email }}",
+              "type": "string"
+            },
+            {
+              "id": "3b9473de-f3ad-49ca-ae37-8812b6e08682",
+              "name": "service_type",
+              "value": "={{ $json.service_type }}",
+              "type": "string"
+            },
+            {
+              "id": "2f7d1903-ed6c-4942-9fb3-6dac52ac2abe",
+              "name": "notes",
+              "value": "={{ $json.notes }}",
+              "type": "string"
+            },
+            {
+              "id": "d13b8006-9eb7-46ed-bab6-81e466927525",
+              "name": "startISO",
+              "value": "={{ $json.startISO }}",
+              "type": "string"
+            },
+            {
+              "id": "2cce73d8-a23d-49ea-bd12-86216602cd0f",
+              "name": "endISO",
+              "value": "={{ $json.endISO }}",
+              "type": "string"
+            },
+            {
+              "id": "0ee9667a-33a6-42f5-91a8-8c4422c7eafd",
+              "name": "calendar_summary",
+              "value": "={{ $json.calendar_summary }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "698b9103-ac5d-44fc-820f-4a61c82107f0",
+      "name": "data"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "developer@example.com",
+          "mode": "list",
+          "cachedResultName": "developer@example.com"
+        },
+        "start": "={{ $json.startISO }}",
+        "end": "={{ $json.endISO }}",
+        "additionalFields": {
+          "description": "={{ $json.service_type }}: {{ $json.calendar_summary }}",
+          "summary": "={{ $json.service_type }}:{{ $json.notes }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "0595341f-678f-4fde-85c0-e70030f73dd9",
+      "name": "Book appointment",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $('data').item.json.customer_email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        816,
+        0
+      ],
+      "id": "9a42b051-c163-4a61-ba90-801ee124eac9",
+      "name": "Get Lead from Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1024,
+        2560
+      ],
+      "id": "f33cc7ce-1cd4-45b2-9d6d-a06fc8f10f09",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "Voice Agent",
+              "condition": "eq",
+              "keyValue": "sms"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        2560
+      ],
+      "id": "c970fa2e-c4b2-4acc-a57c-649f30a9e4e9",
+      "name": "Get many rows2",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Voice Agent",
+              "fieldValue": "sms"
+            },
+            {
+              "fieldId": "sms_sent_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            },
+            {
+              "fieldId": "call attempt",
+              "fieldValue": "={{ $json.call_attempts + 1 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        2560
+      ],
+      "id": "19e9baa5-8f9a-4057-bfa4-dd045c9f03a7",
+      "name": "update lead attempt reach",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "GetAvailability",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -816,
+        560
+      ],
+      "id": "b992964b-badf-4f1f-a9cc-2956e23ca26d",
+      "name": "Get Availability Webhook",
+      "webhookId": "11111111-aaaa-bbbb-cccc-000000000001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// PARSE AVAILABILITY REQUEST — IST AWARE\n// Input:  { date?: 'YYYY-MM-DD', lead_id?: string }\n// Output: { valid, lead_id, date_from (ISO), date_to (ISO) }\n// All logic done in IST (UTC+5:30)\n// ============================================================\n\nconst IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // 19800000 ms\n\n// Helper: get current time in IST as a plain object\nfunction nowIST() {\n  const nowUtc = Date.now();\n  return new Date(nowUtc + IST_OFFSET_MS);\n}\n\n// Helper: build a UTC timestamp for a given IST date+hour+minute\nfunction istToUtcMs(year, month, day, hour, minute) {\n  // month is 0-indexed\n  const utcMs = Date.UTC(year, month, day, hour, minute, 0, 0) - IST_OFFSET_MS;\n  return utcMs;\n}\n\nconst body   = $input.item.json.body || $input.item.json;\nconst rawDate = (body.date || body.date_from || '').toString().trim();\nconst lead_id = (body.lead_id || '').toString().trim();\n\n// ── Determine start date in IST ───────────────────────────────\nlet istYear, istMonth, istDay;\n\nif (rawDate && /^\\d{4}-\\d{2}-\\d{2}$/.test(rawDate)) {\n  const parts = rawDate.split('-').map(Number);\n  istYear  = parts[0];\n  istMonth = parts[1] - 1; // 0-indexed\n  istDay   = parts[2];\n\n  // Auto-correct: if parsed date is in the past (e.g. LLM sent 2024 instead of 2026), default to today\n  const parsedUtcMs = Date.UTC(istYear, istMonth, istDay);\n  const nCheck = nowIST();\n  const todayUtcMs = Date.UTC(nCheck.getUTCFullYear(), nCheck.getUTCMonth(), nCheck.getUTCDate());\n  if (parsedUtcMs < todayUtcMs) {\n    istYear  = nCheck.getUTCFullYear();\n    istMonth = nCheck.getUTCMonth();\n    istDay   = nCheck.getUTCDate();\n  }\n} else {\n  // Use today in IST\n  const n = nowIST();\n  istYear  = n.getUTCFullYear();\n  istMonth = n.getUTCMonth();\n  istDay   = n.getUTCDate();\n}\n\n// ── Push to next weekday if weekend ──────────────────────────\n// Build a temporary date to check day-of-week\nlet checkDate = new Date(Date.UTC(istYear, istMonth, istDay, 0, 0, 0));\nlet dow = checkDate.getUTCDay();\nif (dow === 6) { checkDate.setUTCDate(checkDate.getUTCDate() + 2); } // Sat → Mon\nif (dow === 0) { checkDate.setUTCDate(checkDate.getUTCDate() + 1); } // Sun → Mon\n\nistYear  = checkDate.getUTCFullYear();\nistMonth = checkDate.getUTCMonth();\nistDay   = checkDate.getUTCDate();\n\n// ── Build from/to as UTC timestamps representing IST 08:00 / 18:00 ──\n// from = requested date 08:00 IST\n// to   = requested date + 5 days 18:00 IST\nconst fromUtcMs = istToUtcMs(istYear, istMonth, istDay, 8, 0);\nconst toDate    = new Date(Date.UTC(istYear, istMonth, istDay + 5, 18, 0, 0, 0));\nconst toUtcMs   = toDate.getTime() - IST_OFFSET_MS;\n\nreturn [{\n  json: {\n    valid:     true,\n    lead_id,\n    date_from: new Date(fromUtcMs).toISOString(),\n    date_to:   new Date(toUtcMs).toISOString(),\n    // Pass IST date components for slot generator\n    ist_start_year:  istYear,\n    ist_start_month: istMonth,\n    ist_start_day:   istDay\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        560
+      ],
+      "id": "012b88ff-32db-4d39-99b3-86abd5fab8bb",
+      "name": "Parse Availability Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": false,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "condition-1776770164603-v7pvc308k"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -304,
+        560
+      ],
+      "id": "30615578-e8d6-49c3-b1a9-b86057397508",
+      "name": "Availability Valid?"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "developer@example.com",
+          "mode": "list",
+          "cachedResultName": "developer@example.com"
+        },
+        "options": {
+          "orderBy": "startTime"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        32,
+        560
+      ],
+      "id": "617f4bd4-279c-44a8-84aa-acb84c903004",
+      "name": "Get Calendar Events",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// BUILD AVAILABLE SLOTS — IST TIMEZONE CORRECT\n// \n// KEY FIX: All slot generation and comparison happens in IST.\n// Google Calendar returns events with timezone offsets (+05:30).\n// We must parse those correctly and compare in IST space.\n// ============================================================\n\nconst IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;\n\n// Convert any datetime string to UTC milliseconds correctly\n// Works with: '2026-04-21T08:00:00.000Z' OR '2026-04-17T18:30:00+05:30'\nfunction toUtcMs(dateStr) {\n  return new Date(dateStr).getTime(); // JS Date handles tz offsets natively\n}\n\n// Convert UTC ms → IST hour (0-23)\nfunction utcMsToISTHour(ms) {\n  return new Date(ms + IST_OFFSET_MS).getUTCHours();\n}\n\n// Convert UTC ms → IST day-of-week (0=Sun,6=Sat)\nfunction utcMsToISTDow(ms) {\n  return new Date(ms + IST_OFFSET_MS).getUTCDay();\n}\n\n// Convert UTC ms → IST date string YYYY-MM-DD\nfunction utcMsToISTDate(ms) {\n  const d = new Date(ms + IST_OFFSET_MS);\n  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;\n}\n\n// Get IST components from UTC ms\nfunction getISTComponents(ms) {\n  const d = new Date(ms + IST_OFFSET_MS);\n  return {\n    year:    d.getUTCFullYear(),\n    month:   d.getUTCMonth(),   // 0-indexed\n    day:     d.getUTCDate(),\n    hour:    d.getUTCHours(),\n    minute:  d.getUTCMinutes(),\n    dow:     d.getUTCDay()\n  };\n}\n\n// Build UTC ms from IST components (year, month 0-indexed, day, hour, min)\nfunction istComponentsToUtcMs(year, month, day, hour, minute) {\n  return Date.UTC(year, month, day, hour, minute, 0, 0) - IST_OFFSET_MS;\n}\n\n// ── 1. Get parsed range ───────────────────────────────────────\nconst parsed  = $('Parse Availability Request').item.json;\nconst lead_id = parsed.lead_id || '';\n\nconst fromUtcMs = toUtcMs(parsed.date_from);\nconst toUtcMs_  = toUtcMs(parsed.date_to);\n\n// Current time in UTC ms\nconst nowUtcMs = Date.now();\n\n// ── 2. Build busy windows from Google Calendar ────────────────\nconst allItems = $input.all();\nconst seen = new Set();\nconst busyWindows = [];\n\nfor (const item of allItems) {\n  const e = item.json;\n  if (!e.start) continue;\n\n  // Handle both dateTime events and all-day (date-only) events\n  const startStr = e.start.dateTime || e.start.date;\n  const endStr   = e.end.dateTime   || e.end.date;\n  if (!startStr || !endStr) continue;\n\n  const startMs = toUtcMs(startStr);\n  const endMs   = toUtcMs(endStr);\n  const key     = `${startMs}-${endMs}`;\n\n  if (seen.has(key)) continue;\n  seen.add(key);\n\n  busyWindows.push({ start: startMs, end: endMs });\n}\n\n// Overlap checker\nfunction isBooked(slotStartMs, slotEndMs) {\n  return busyWindows.some(b => slotStartMs < b.end && slotEndMs > b.start);\n}\n\n// ── 3. Generate 1-hour slots Mon-Fri 08:00-18:00 IST ─────────\nconst slots  = [];\nconst DAYS   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];\nconst MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\n\n// Start cursor at fromDate components in IST\nlet { year: cy, month: cm, day: cd } = getISTComponents(fromUtcMs);\nlet currentHour = 8; // Start at 08:00 IST\n\n// Safety limit: max 14 days scan\nconst maxDays = 14;\nlet daysScanned = 0;\n\nwhile (slots.length < 8 && daysScanned < maxDays) {\n\n  // Build slot start in UTC ms\n  const slotStartMs = istComponentsToUtcMs(cy, cm, cd, currentHour, 0);\n  const slotEndMs   = istComponentsToUtcMs(cy, cm, cd, currentHour + 1, 0);\n\n  const dow = utcMsToISTDow(slotStartMs);\n\n  // Skip weekends\n  if (dow === 0 || dow === 6) {\n    // Move to next day at 08:00\n    cd++;\n    currentHour = 8;\n    daysScanned++;\n    continue;\n  }\n\n  // Past 6pm IST → next day\n  if (currentHour >= 18) {\n    cd++;\n    currentHour = 8;\n    daysScanned++;\n    continue;\n  }\n\n  // Skip past slots (already happened)\n  if (slotStartMs <= nowUtcMs) {\n    currentHour++;\n    continue;\n  }\n\n  // Skip if outside our requested range\n  if (slotStartMs > toUtcMs_) break;\n\n  // Skip if booked\n  if (!isBooked(slotStartMs, slotEndMs)) {\n    const h    = currentHour;\n    const ampm = h >= 12 ? 'PM' : 'AM';\n    const h12  = h > 12 ? h - 12 : h === 0 ? 12 : h;\n    const { day: labelDay, month: labelMonth } = getISTComponents(slotStartMs);\n    const dowLabel = DAYS[dow];\n    const monLabel = MONTHS[labelMonth];\n\n    slots.push({\n      label:     `${dowLabel}, ${monLabel} ${labelDay} at ${h12}:00 ${ampm}`,\n      date:      utcMsToISTDate(slotStartMs),\n      time:      `${String(h).padStart(2,'0')}:00`,\n      iso_start: new Date(slotStartMs).toISOString(),\n      iso_end:   new Date(slotEndMs).toISOString()\n    });\n  }\n\n  currentHour++;\n}\n\n// ── 4. Return ─────────────────────────────────────────────────\nconst fromLabel = utcMsToISTDate(fromUtcMs);\nconst toLabel   = utcMsToISTDate(toUtcMs_);\n\nreturn [{\n  json: {\n    success:          true,\n    lead_id,\n    slots_found:      slots.length,\n    busy_slots_found: busyWindows.length,\n    available_slots:  slots,\n    slots_text: slots.map((s, i) => `Option ${i+1}: ${s.label}`).join('. '),\n    message: slots.length > 0\n      ? `Found ${slots.length} available slot(s) from ${fromLabel} to ${toLabel}`\n      : `No available slots found between ${fromLabel} and ${toLabel}. Try different dates.`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        560
+      ],
+      "id": "1ead7a2f-4908-45b6-a38b-de88d763c37c",
+      "name": "Build Available Slots"
+    },
+    {
+      "parameters": {
+        "jsCode": "const err = $input.item.json;\nreturn [{\n  json: {\n    success: false,\n    error: err.error || 'Validation failed'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        752
+      ],
+      "id": "c354874d-bd60-44af-9e53-489800865c8a",
+      "name": "Availability Error Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        912,
+        560
+      ],
+      "id": "47f73785-d062-4c5c-b4ea-96876338f6b2",
+      "name": "Respond - Availability"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        752
+      ],
+      "id": "c1e856cb-5f7e-420e-8285-04ae937de501",
+      "name": "Respond - Availability Error"
+    },
+    {
+      "parameters": {
+        "content": "# BOOK APPOINTMENT",
+        "height": 80,
+        "width": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        0
+      ],
+      "id": "c7ebf283-9476-4677-a3e1-b5d9427e1345",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# CHECK APPOINTMENT",
+        "height": 80,
+        "width": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        592
+      ],
+      "id": "a7610bcd-56d2-4655-8ee0-ebd5930dc120",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# SEND FORM URL (WINDOWS)",
+        "height": 112,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        528,
+        1120
+      ],
+      "id": "1488d576-27d5-45c7-b259-c9096922dc9a",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "# SEND FORM URL (WINDOWS)",
+        "height": 112,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        1568
+      ],
+      "id": "54ee6d98-1abb-4ab8-9752-f7f33e6f1b8e",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "# CALL MISS FOLLOWUPS 24 HOURS AND 7 DAYS\n",
+        "height": 112,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        752,
+        2608
+      ],
+      "id": "013e9f94-278e-4408-b3b9-33dda03fc00b",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "# DAILY TRIGGER FOR REMINDER OF APPOINTMENT BOOKING\n",
+        "height": 112,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        3040
+      ],
+      "id": "a44f5ea2-b6ff-449d-9fac-072fc8f0d53e",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "# 2 HORS BEFORE THE APPOINTMENT\n",
+        "height": 112,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        3536
+      ],
+      "id": "f6a33b86-4c12-405f-b03d-d2eb4d831b00",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=analyze this data : form_status: {{ $json.body.form_status }} and note{{ $json.body.form_status }}  and at the output just tell wether the client has submited for or not  analyze just like words like submitted or form status is contacted in json fformat output:\nexample:\n{\n\"form submitted\":\"true\"\n}\n\ndo not give any other output apart from this no extra text just json output"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -1344,
+        1200
+      ],
+      "id": "62d27afc-9530-4c6d-9c87-576cb902ce96",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get raw text from LLM output\nconst text = $input.first().json.output?.[0]?.content?.[0]?.text || \"\";\n\n// Default value\nlet formSubmitted = false;\n\n// Try to extract JSON from text\ntry {\n    const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);\n    \n    if (jsonMatch) {\n        const parsed = JSON.parse(jsonMatch[0]);\n\n        // Normalize key (handle spaces / casing issues)\n        const value = parsed[\"form submitted\"] || parsed[\"form_submitted\"] || parsed[\"formSubmitted\"];\n\n        if (typeof value === \"string\") {\n            formSubmitted = value.toLowerCase() === \"true\";\n        } else if (typeof value === \"boolean\") {\n            formSubmitted = value;\n        }\n    }\n} catch (error) {\n    // fallback: keyword check\n    if (text.toLowerCase().includes('\"form submitted\":\"true\"')) {\n        formSubmitted = true;\n    }\n}\n\n// Return clean output\nreturn [\n  {\n    json: {\n      form_submitted: formSubmitted\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        1200
+      ],
+      "id": "ee4e0f2e-37ec-4a8f-b9d1-6707014eacc4",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://{{SUPABASE_PROJECT_URL}}/rest/v1/appointments?status=eq.scheduled&appointment_date=lt.{{ $now.toFormat('yyyy-MM-dd') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "4bed17b4-b4bc-4ddc-b046-ce7a366cd7e4",
+      "name": "Auto-Complete Past Appointments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -864,
+        3296
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_form_output",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "51d9ce42-080f-497d-b93f-52e2f9ec80d4",
+      "name": "IF: OpenAI OK (Form)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.minimaxi.chat/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"MiniMax-Text-01\", messages: [{ role: \"user\", content: \"analyze this data : form_status: \" + $('update_form_status').first().json.body.form_status + \" and at the output just tell whether the client has submitted the form or not in json format output:\\nexample:\\n{\\\"form submitted\\\":\\\"true\\\"}\\n\\ndo not give any other output apart from this no extra text just json output\" }] }) }}",
+        "options": {}
+      },
+      "id": "71064bd6-2b37-4e8a-9e62-87ac9a47ed6c",
+      "name": "MiniMax - Form Status Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -896,
+        1360
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "MiniMax - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $json.choices[0].message.content;\nreturn [{ json: { output: [{ content: [{ type: 'text', text: content }] }] } }];"
+      },
+      "id": "6699676a-d6ad-4c36-8c48-0c49241660c1",
+      "name": "Normalize MiniMax Form Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_agent_ok",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8b84cd35-8381-40bd-9dd3-99910c6ea7e5",
+      "name": "IF: AI Agent OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        1712
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.minimaxi.chat/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"MiniMax-Text-01\", messages: [{ role: \"system\", content: \"You are a lead scoring engine for Apex Windows TX. Analyze the call data and return ONLY a JSON object with these exact fields: lead_score(number), qualification_stage(string), priority(string), job_size(string), job_type(string), estimated_revenue(string), deal_value_range(string), customer_intent(string), budget_signal(string), budget_signal_detail(string), lead_temperature(string), conversion_probability(number), sales_readiness(string), follow_up_urgency_hours(number), recommended_action(string), call_transfer_requested(boolean), call_transfer_status(string), form_submitted(string), score_breakdown({positive_signals:[],negative_signals:[]}), reasoning(string), flags([]), crm_stage(string), sales_manager_note(string), is_high_priority(boolean), needs_callback(boolean), callback_within_minutes(number). Output raw JSON only, no markdown.\" }, { role: \"user\", content: \"call data:\\n\" + $('post call webhook').item.json.body.data.analysis.call_successful + \"\\n\" + $('post call webhook').item.json.body.data.conversation_initiation_client_data.dynamic_variables.system__conversation_history + \"\\ncustomer address: \" + $('Code in JavaScript').item.json.customer_address }] }) }}",
+        "options": {}
+      },
+      "id": "8270441b-2cc5-4dfc-a159-8b1182d50da7",
+      "name": "MiniMax - Score Fallback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        1856
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "MiniMax - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $json.choices[0].message.content;\nreturn [{ json: { output: content } }];"
+      },
+      "id": "165799e8-4e78-4598-88c0-6f1916c8dd90",
+      "name": "Normalize MiniMax Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        1856
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass calendar events through unchanged.\n// If calendar is empty, return a placeholder so Build Available Slots always runs.\n// Build Available Slots skips items without a 'start' field, so the placeholder is harmless.\nconst items = $input.all();\nif (items.length > 0) {\n  return items;\n}\nreturn [{ json: { placeholder: true } }];"
+      },
+      "id": "ensure-calendar-items",
+      "name": "Code: Ensure Calendar Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        560
+      ]
+    }
+  ],
+  "connections": {
+    "post call webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_form_status": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "send link of form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a row1": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send link of form": {
+      "main": [
+        [
+          {
+            "node": "Update a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Get a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "send mail to expert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send mail to expert": {
+      "main": [
+        [
+          {
+            "node": "thank you",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a row2": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Leads": {
+      "main": [
+        [
+          {
+            "node": "send sms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send sms": {
+      "main": [
+        [
+          {
+            "node": "update lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Get a row3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a row3": {
+      "main": [
+        [
+          {
+            "node": "Update a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Keep Retrying? (< 7 attempts)": {
+      "main": [
+        [
+          {
+            "node": "Wait: 24 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait: 7 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: 24 Hours": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Retry SMS (Day 2-7)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Retry SMS (Day 2-7)": {
+      "main": [
+        [
+          {
+            "node": "Twilio: Send Retry SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait: 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Weekly Re-engagement SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Weekly Re-engagement SMS": {
+      "main": [
+        [
+          {
+            "node": "Twilio: Send Weekly Re-engagement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: Daily 8am CT": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Auto-Complete Past Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Any Appointments Tomorrow?": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches (1 at a time)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code: Format Time & Build Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Time & Build Reminder": {
+      "main": [
+        [
+          {
+            "node": "Twilio: Send 24hr Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio: Send 24hr Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update a row3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "IF: Any Appointments Tomorrow?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron: Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get many rows1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Filter Appointments in 2hr Window": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build 2hr Reminder Message": {
+      "main": [
+        [
+          {
+            "node": "Twilio: Send 2hr Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twilio: Send 2hr Reminder": {
+      "main": [
+        [
+          {
+            "node": "Update a row4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches (1 at a time)1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code: Build 2hr Reminder Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows1": {
+      "main": [
+        [
+          {
+            "node": "Code: Filter Appointments in 2hr Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (1 at a time)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Appointment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Booking": {
+      "main": [
+        [
+          {
+            "node": "Booking Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Valid?": {
+      "main": [
+        [
+          {
+            "node": "data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Booking Data": {
+      "main": [
+        [
+          {
+            "node": "Get Lead from Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Appointment to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmation Email": {
+      "main": [
+        [
+          {
+            "node": "Build Booking Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Booking Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Booking Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Error Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Booking Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "data": {
+      "main": [
+        [
+          {
+            "node": "Book appointment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book appointment": {
+      "main": [
+        [
+          {
+            "node": "Merge Booking Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead from Supabase": {
+      "main": [
+        [
+          {
+            "node": "Save Appointment to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows2": {
+      "main": [
+        [
+          {
+            "node": "update lead attempt reach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update lead attempt reach": {
+      "main": [
+        [
+          {
+            "node": "IF: Keep Retrying? (< 7 attempts)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Availability Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Availability Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Availability Request": {
+      "main": [
+        [
+          {
+            "node": "Availability Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Availability Valid?": {
+      "main": [
+        [
+          {
+            "node": "Get Calendar Events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Availability Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Available Slots": {
+      "main": [
+        [
+          {
+            "node": "Respond - Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Availability Error Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Availability Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row3": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (1 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row4": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (1 at a time)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "IF: OpenAI OK (Form)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: OpenAI OK (Form)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MiniMax - Form Status Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MiniMax - Form Status Fallback": {
+      "main": [
+        [
+          {
+            "node": "Normalize MiniMax Form Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize MiniMax Form Output": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "IF: AI Agent OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: AI Agent OK": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MiniMax - Score Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MiniMax - Score Fallback": {
+      "main": [
+        [
+          {
+            "node": "Normalize MiniMax Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize MiniMax Score": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Calendar Events": {
+      "main": [
+        [
+          {
+            "node": "Code: Ensure Calendar Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Ensure Calendar Items": {
+      "main": [
+        [
+          {
+            "node": "Build Available Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

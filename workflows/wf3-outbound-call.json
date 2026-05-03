@@ -1,0 +1,380 @@
+{
+  "name": "Apex Workflow 3 - Outbonding Call",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-lead",
+        "options": {}
+      },
+      "id": "f1adc4db-af22-4aa7-afb4-8d671d3895ae",
+      "name": "Webhook: /new-lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1840,
+        -96
+      ],
+      "webhookId": "apex-new-lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\n// ✅ Normalize fields\nconst name = body.customer_name || '';\nconst phone = body.phone_number || '';\nconst email = body.email || '';\n\n// ✅ Validation\nconst errors = [];\n\nif (!name || name.trim() === '') {\n  errors.push('Missing customer_name');\n}\n\nif (!phone || phone.trim() === '') {\n  errors.push('Missing phone_number');\n}\n\n// ❌ If invalid\nif (errors.length > 0) {\n  return [\n    {\n      json: {\n        valid: false,\n        errors,\n        original: body\n      }\n    }\n  ];\n}\n\n// ✅ If valid\nreturn [\n  {\n    json: {\n      valid: true,\n      customer_name: name.trim(),\n      phone_number: phone,\n      email: email,\n      customer_address: body.customer_address || '',\n      issue_description: body.issue_description || '',\n      window_count: body.window_count || 0,\n      lead_id: body.lead_id\n    }\n  }\n];"
+      },
+      "id": "a12cf6be-6107-44c5-a403-cd9d0d8a1175",
+      "name": "Code: Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "2c51162a-e2e9-4d75-b482-b1d0dc34bc62",
+      "name": "IF: Payload Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1376,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, errors: $json.errors }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "f1d390e5-8745-4622-8121-46fceed798d0",
+      "name": "Respond: 400 Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -1072,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ✅ Get validated data ONLY\nconst validatedNode = $('Code: Validate & Normalize').first();\nconst validated = validatedNode?.json || {};\n\n// ✅ Time calculation (Central Time)\nconst now = new Date();\n\nconst centralHour = parseInt(\n  new Intl.DateTimeFormat('en-US', {\n    timeZone: 'Asia/Kolkata',\n    hour: 'numeric',\n    hour12: false\n  }).format(now)\n);\n\n// ✅ Business logic\nconst withinHours = true;\n\n// ✅ Final output (NO SUPABASE)\nreturn [\n  {\n    json: {\n      ...validated,\n      within_call_hours: withinHours,\n      current_hour_central: centralHour\n    }\n  }\n];"
+      },
+      "id": "2c0a545a-2199-4b95-a9ed-280dff1b8df6",
+      "name": "Code: Time Check 8AM-8PM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "time-check",
+              "leftValue": "={{ $json.within_call_hours }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "f19b0773-b90e-48de-a112-de76b9538477",
+              "leftValue": 1,
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b5d6292c-e119-4728-80f3-508b590127c8",
+      "name": "IF: Within Call Hours?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -736,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"message\": \"Lead received\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "e35dbc73-3e73-44fd-bbcc-da5385297b56",
+      "name": "Respond: 200 Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "from": "=+12603059676",
+        "to": "={{ $json.phone_number }}",
+        "message": "=Hi {{ $json.customer_name }}! 👋 Thanks for reaching out to Apex Windows TX — we received your request. Our team will give you a call first thing tomorrow morning. Talk soon!",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -16
+      ],
+      "id": "fe6440b5-3ba0-482b-8dbf-a977023e8aa1",
+      "name": "Send an SMS/MMS/WhatsApp message",
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Code: Validate & Normalize').first().json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "Voice Agent",
+              "fieldValue": "={{ $json.contact_type }}"
+            },
+            {
+              "fieldId": "sms_sent_at",
+              "fieldValue": "={{ $json.contact_type === 'sms' ? $now.toISO() : null }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        608,
+        -160
+      ],
+      "id": "6c0938e1-a3a9-42f3-800d-dedb9008b57c",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const data = item.json;\n\n  // ✅ Check if conversation_id exists\n  const isCall = !!data.conversation_id;\n\n  return {\n    json: {\n      ...data,\n      contact_type: isCall ? 'call' : 'sms'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -160
+      ],
+      "id": "a41662f6-f0cb-4e26-ad26-bd0520888acf",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/convai/twilio/outbound-call",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "sk_94ed08e5bae37fcbdbfd3471a5c87c4cbe32c21ad35b6a89"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"agent_id\": \"agent_7101kp7s2x8pe0zt9knpnvht8853\",\n  \"agent_phone_number_id\": \"phnum_5001kqcgdbj5fy58wk1e4g2rj8p6\",\n  \"to_number\": \"{{ $json.phone_number }}\",\n  \"conversation_initiation_client_data\": {\n    \"dynamic_variables\": {\n      \"customer_name\": \"{{ $json.customer_name }}\",\n      \"customer_address\": \"{{ $json.customer_address }}\",\n      \"issue_description\": \"{{ $json.issue_description }}\",\n      \"window_count\": \"{{ $json.window_count }}\",\n      \"lead_id\": \"{{ $json.email }}\",\n      \"lead_uuid\": \"{{ $json.lead_id }}\",\n      \"email\": \"{{ $json.email }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "24bb81ad-ef4a-46db-af22-f815fe9721d1",
+      "name": "elevan lab agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -368,
+        -272
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: /new-lead": {
+      "main": [
+        [
+          {
+            "node": "Code: Validate & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Validate & Normalize": {
+      "main": [
+        [
+          {
+            "node": "IF: Payload Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Payload Valid?": {
+      "main": [
+        [
+          {
+            "node": "Code: Time Check 8AM-8PM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: 400 Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Time Check 8AM-8PM": {
+      "main": [
+        [
+          {
+            "node": "IF: Within Call Hours?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Within Call Hours?": {
+      "main": [
+        [
+          {
+            "node": "elevan lab agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an SMS/MMS/WhatsApp message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond: 200 Success": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an SMS/MMS/WhatsApp message": {
+      "main": [
+        [
+          {
+            "node": "Respond: 200 Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "elevan lab agent": {
+      "main": [
+        [
+          {
+            "node": "Respond: 200 Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

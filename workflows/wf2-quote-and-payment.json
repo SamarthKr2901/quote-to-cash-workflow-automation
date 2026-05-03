@@ -1,0 +1,3338 @@
+{
+  "name": "Apex Workflow 2 - Quote Approval & Payment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "quote-approval-ready",
+        "options": {}
+      },
+      "id": "a001",
+      "name": "Webhook - Quote Approval Ready",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        0
+      ],
+      "webhookId": "1d2fccb8-8b5f-4daa-b0bc-01cec1d67a0c"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.body.lead_id }}"
+      },
+      "id": "a002",
+      "name": "Fetch Lead A",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "estimates",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Webhook - Quote Approval Ready').item.json.body.estimate_id }}"
+      },
+      "id": "a003",
+      "name": "Fetch Estimate",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        160,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst token = crypto.randomBytes(32).toString('hex');\nreturn [{ json: { acceptance_token: token } }];"
+      },
+      "id": "a004",
+      "name": "Generate Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "quotes",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Webhook - Quote Approval Ready').item.json.body.lead_id }}"
+            },
+            {
+              "fieldId": "estimate_id",
+              "fieldValue": "={{ $('Webhook - Quote Approval Ready').item.json.body.estimate_id }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "pending_approval"
+            },
+            {
+              "fieldId": "acceptance_token",
+              "fieldValue": "={{ $('Generate Token').item.json.acceptance_token }}"
+            },
+            {
+              "fieldId": "pdf_url",
+              "fieldValue": "={{ $('Webhook - Quote Approval Ready').item.json.body.pdf_url }}"
+            },
+            {
+              "fieldId": "total_amount",
+              "fieldValue": "={{ $('Fetch Estimate').item.json.total }}"
+            }
+          ]
+        }
+      },
+      "id": "a005",
+      "name": "Create Quote Record",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "quote_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "lead_id",
+              "value": "={{ $('Fetch Lead A').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "lead_name",
+              "value": "={{ $('Fetch Lead A').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "lead_email",
+              "value": "={{ $('Fetch Lead A').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "f5",
+              "name": "estimate_total",
+              "value": "={{ $('Fetch Estimate').item.json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "f6",
+              "name": "acceptance_token",
+              "value": "={{ $('Generate Token').item.json.acceptance_token }}",
+              "type": "string"
+            },
+            {
+              "id": "f7",
+              "name": "crm_approve_url",
+              "value": "={{ 'https://apexwindowstx.com/admin/crm/leads/' + $('Fetch Lead A').item.json.id + '/approve?quote=' + $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f8",
+              "name": "customer_accept_url",
+              "value": "={{ 'https://apexwindowstx.com/quote/accept?token=' + $('Generate Token').item.json.acceptance_token }}",
+              "type": "string"
+            },
+            {
+              "id": "f9",
+              "name": "customer_decline_url",
+              "value": "={{ 'https://apexwindowstx.com/quote/decline?token=' + $('Generate Token').item.json.acceptance_token }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a006",
+      "name": "Build Approval URLs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Fetch Lead A').item.json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Quote Pending Approval"
+            }
+          ]
+        }
+      },
+      "id": "a007",
+      "name": "Update Pipeline - Quote Pending",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Fetch Lead A').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "quote_approval_queued"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({quote_id: $('Build Approval URLs').item.json.quote_id, estimate_total: $('Build Approval URLs').item.json.estimate_total}) }}"
+            }
+          ]
+        }
+      },
+      "id": "a008",
+      "name": "Log - Quote Queued",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "manager-approved",
+        "options": {}
+      },
+      "id": "b001",
+      "name": "Webhook - Manager Approved",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        608
+      ],
+      "webhookId": "d057c78e-a0ee-4bf5-9e37-30d590a271f4"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.body.lead_id }}"
+      },
+      "id": "b002",
+      "name": "Fetch Lead B",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "quotes",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Webhook - Manager Approved').item.json.body.quote_id + '&status=eq.pending_approval' }}"
+      },
+      "id": "b003",
+      "name": "Validate Quote",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        160,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Webhook - Manager Approved').item.json.body.adjusted_price }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b004",
+      "name": "IF Price Adjusted",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        448,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "estimates",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Validate Quote').item.json.estimate_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "adjusted_total",
+              "fieldValue": "={{ $('Webhook - Manager Approved').item.json.body.adjusted_price }}"
+            },
+            {
+              "fieldId": "manually_adjusted",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "approved"
+            }
+          ]
+        }
+      },
+      "id": "b005",
+      "name": "Update Estimate Adjusted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        832
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "final_total",
+              "value": "={{ $('Webhook - Manager Approved').item.json.body.adjusted_price || $('Validate Quote').item.json.total_amount }}",
+              "type": "number"
+            },
+            {
+              "id": "f2",
+              "name": "quote_id",
+              "value": "={{ $('Webhook - Manager Approved').item.json.body.quote_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "lead_id",
+              "value": "={{ $('Webhook - Manager Approved').item.json.body.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "approved_by",
+              "value": "={{ $('Webhook - Manager Approved').item.json.body.approved_by }}",
+              "type": "string"
+            },
+            {
+              "id": "f5",
+              "name": "lead_email",
+              "value": "={{ $('Fetch Lead B').item.json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "f6",
+              "name": "lead_name",
+              "value": "={{ $('Fetch Lead B').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "f7",
+              "name": "acceptance_token",
+              "value": "={{ $('Validate Quote').item.json.acceptance_token }}",
+              "type": "string"
+            },
+            {
+              "id": "f8",
+              "name": "pdf_url",
+              "value": "={{ $('Validate Quote').item.json.pdf_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b006",
+      "name": "Set Final Total",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1008,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\nconst aUrl = `https://{{N8N_BASE_URL}}/webhook/quote-accept?token=${ctx.acceptance_token}`;\nconst dUrl = `https://{{N8N_BASE_URL}}/webhook/quote-decline?token=${ctx.acceptance_token}`;\nconst total = parseFloat(ctx.final_total || 0).toFixed(2);\nconst html = `<!DOCTYPE html><html><body style=\"font-family:Arial;max-width:620px;margin:0 auto\"><div style=\"background:#4A148C;padding:22px 8px;border-radius:8px 8px 0 0\"><h1 style=\"color:#fff;margin:0\">Apex Windows TX</h1><p style=\"color:#CE93D8;margin:5px 0 0\">Your Quote is Ready</p></div><div style=\"padding:24px;background:#fafafa\"><p>Hi ${ctx.lead_name},</p><p>Here is your personalised quote for your window service:</p><table style=\"width:100%;border-collapse:collapse;margin:14px 0\"><tr style=\"background:#4A148C\"><th style=\"color:#fff;padding:9px;text-align:left\">Service</th><th style=\"color:#fff;padding:9px;text-align:right\">Price</th></tr><tr><td style=\"padding:9px\">Window Service</td><td style=\"padding:9px;text-align:right\">$${total}</td></tr></table><div style=\"text-align:center;margin:28px 0\"><a href=\"${aUrl}\" style=\"background:#2E7D32;color:#fff;padding:15px 30px;border-radius:6px;text-decoration:none;font-size:17px;font-weight:bold\">Accept This Quote</a></div><p style=\"text-align:center;font-size:12px;color:#aaa\">Not interested? <a href=\"${dUrl}\">Decline here</a></p><p style=\"font-size:12px;text-align:center\">Questions? Call 214-555-0100</p><p style=\"font-size:11px;color:#ccc;text-align:center;margin-top:16px\">[TEST EMAIL]</p></div></body></html>`;\nreturn [{ json: { ...ctx, quote_html: html } }];"
+      },
+      "id": "b007",
+      "name": "Build Quote Email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $('Set Final Total').item.json.lead_email }}",
+        "subject": "={{ 'Your Apex Windows Quote - $' + parseFloat($json.final_total).toFixed(2) + ' | Please Review' }}",
+        "html": "={{ $json.quote_html }}",
+        "options": {
+          "replyTo": "sales-manager@example.com"
+        }
+      },
+      "id": "b008",
+      "name": "Email Quote to Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1568,
+        608
+      ],
+      "webhookId": "66b6cf98-bc3d-4841-a3ed-1ea2cee40f44",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "quotes",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Webhook - Manager Approved').item.json.body.quote_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "sent"
+            },
+            {
+              "fieldId": "approved_by",
+              "fieldValue": "={{ $('Set Final Total').item.json.approved_by }}"
+            },
+            {
+              "fieldId": "approved_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "sent_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "total_amount",
+              "fieldValue": "={{ $('Set Final Total').item.json.final_total }}"
+            }
+          ]
+        }
+      },
+      "id": "b009",
+      "name": "Update Quote - Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Set Final Total').item.json.lead_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Quote Sent"
+            }
+          ]
+        }
+      },
+      "id": "b010",
+      "name": "Update Pipeline - Quote Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2128,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "escalations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Set Final Total').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "customer_not_responded"
+            },
+            {
+              "fieldId": "due_at",
+              "fieldValue": "={{ new Date(Date.now() + 72*60*60*1000).toISOString() }}"
+            },
+            {
+              "fieldId": "resolved",
+              "fieldValue": "false"
+            }
+          ]
+        }
+      },
+      "id": "b011",
+      "name": "Create Escalation 72hr",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "developer@example.com",
+        "subject": "={{ 'Quote Sent | ' + $('Set Final Total').item.json.lead_name + ' | $' + parseFloat($('Set Final Total').item.json.final_total).toFixed(2) }}",
+        "html": "={{ `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden\"><div style=\"background:#4A148C;padding:22px 28px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse\"><tr><td style=\"vertical-align:top\"><span style=\"color:#fff;font-size:20px;font-weight:bold\">Apex Windows TX</span><div style=\"color:#CE93D8;font-size:13px;margin-top:4px\">Quote Sent to Customer</div></td><td align=\"right\" style=\"vertical-align:top\"><span style=\"background:#7B1FA2;color:#E1BEE7;font-size:10px;font-weight:bold;padding:4px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap\">INTERNAL &bull; STAFF ONLY</span></td></tr></table></div><div style=\"padding:24px 28px;background:#fafafa\"><p style=\"font-size:14px;color:#444;line-height:1.6;margin:0 0 10px\">A quote has been sent and is awaiting the customer&#39;s decision.</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;border:1px solid #e8e0f5;border-radius:6px;overflow:hidden;margin:16px 0\"><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Customer</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Set Final Total').item.json.lead_name}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Email</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Set Final Total').item.json.lead_email}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Quote Total</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">$${parseFloat($('Set Final Total').item.json.final_total).toFixed(2)}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Quote ID</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Set Final Total').item.json.quote_id}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Approved By</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Set Final Total').item.json.approved_by}</td></tr></table><div style=\"background:#E3F2FD;border:1px solid #1565C0;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#1565C0;font-weight:bold\">&#9200; An escalation alert will fire in 72 hours if no response is received.</div><div style=\"border-top:1px solid #e8e0f5;margin-top:24px;padding-top:14px;font-size:11px;color:#bbb;text-align:center\">Apex Windows TX Automation &nbsp;&bull;&nbsp; Internal Notification &nbsp;&bull;&nbsp; [TEST EMAIL]</div></div></div>` }}",
+        "options": {}
+      },
+      "id": "b012",
+      "name": "Email SM - Quote Sent",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2832,
+        608
+      ],
+      "webhookId": "473252cb-ddd7-4aad-8e49-904dfc78ddeb",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Set Final Total').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "quote_sent"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({quote_id: $('Set Final Total').item.json.quote_id, approved_by: $('Set Final Total').item.json.approved_by, total: $('Set Final Total').item.json.final_total}) }}"
+            }
+          ]
+        }
+      },
+      "id": "b013",
+      "name": "Log - Quote Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3072,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-accepted",
+        "options": {}
+      },
+      "id": "c001",
+      "name": "Webhook - Customer Accepted",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        592,
+        1296
+      ],
+      "webhookId": "b4faed74-2624-4cf1-95fa-270661f34053"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "quotes",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'acceptance_token=eq.' + $json.body.token + '&status=eq.sent' }}"
+      },
+      "id": "c002",
+      "name": "Validate Token",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "quotes",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Validate Token').item.json.id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "accepted"
+            },
+            {
+              "fieldId": "accepted_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "c003",
+      "name": "Update Quote - Accepted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Validate Token').item.json.lead_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Quote Accepted"
+            }
+          ]
+        }
+      },
+      "id": "c004",
+      "name": "Update Pipeline - Quote Accepted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1632,
+        1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?lead_id=eq.' + $('Validate Token').item.json.lead_id + '&resolved=eq.false' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({resolved: true, resolved_at: new Date().toISOString()}) }}",
+        "options": {}
+      },
+      "id": "c005",
+      "name": "Resolve Escalation C",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        1296
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "developer@example.com",
+        "subject": "={{ 'Quote Accepted | $' + parseFloat($('Validate Token').item.json.total_amount).toFixed(2) + ' | Action Required: Schedule Now' }}",
+        "html": "={{ `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden\"><div style=\"background:#4A148C;padding:22px 28px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse\"><tr><td style=\"vertical-align:top\"><span style=\"color:#fff;font-size:20px;font-weight:bold\">Apex Windows TX</span><div style=\"color:#CE93D8;font-size:13px;margin-top:4px\">Quote Accepted &mdash; Action Required</div></td><td align=\"right\" style=\"vertical-align:top\"><span style=\"background:#7B1FA2;color:#E1BEE7;font-size:10px;font-weight:bold;padding:4px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap\">INTERNAL &bull; STAFF ONLY</span></td></tr></table></div><div style=\"padding:24px 28px;background:#fafafa\"><div style=\"background:#E8F5E9;border:1px solid #2E7D32;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#2E7D32;font-weight:bold\">&#10003; ACTION REQUIRED: Call the customer to schedule the job.</div><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;border:1px solid #e8e0f5;border-radius:6px;overflow:hidden;margin:16px 0\"><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Quote ID</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Validate Token').item.json.id}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Quote Amount</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">$${parseFloat($('Validate Token').item.json.total_amount).toFixed(2)}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Lead ID</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Validate Token').item.json.lead_id}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Approved By</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Validate Token').item.json.approved_by || 'N/A'}</td></tr></table><p style=\"font-size:13px;font-weight:bold;color:#4A148C;margin:18px 0 6px\">Next Steps</p><ol style=\"padding-left:20px;margin:8px 0 16px\"><li style=\"font-size:13px;color:#444;line-height:2\">Call the customer to confirm a convenient appointment date.</li><li style=\"font-size:13px;color:#444;line-height:2\">Update the pipeline to <strong>Scheduled</strong> once confirmed.</li><li style=\"font-size:13px;color:#444;line-height:2\">Trigger <code style=\"background:#f3e5f5;padding:1px 5px;border-radius:3px\">/webhook/job-completed</code> when the job is complete.</li></ol><div style=\"border-top:1px solid #e8e0f5;margin-top:24px;padding-top:14px;font-size:11px;color:#bbb;text-align:center\">Apex Windows TX Automation &nbsp;&bull;&nbsp; Internal Notification &nbsp;&bull;&nbsp; [TEST EMAIL]</div></div></div>` }}",
+        "options": {}
+      },
+      "id": "c006",
+      "name": "Email SM - Quote Accepted",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2192,
+        1296
+      ],
+      "webhookId": "809048d2-8caa-4b9c-8c42-bdc6bacf60fb",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $('Fetch Lead C').item.json.email }}",
+        "subject": "Your Apex Windows Service is Confirmed | What Happens Next",
+        "html": "={{ '<div style=\"font-family:Arial;max-width:620px;margin:0 auto\"><div style=\"background:#4A148C;padding:22px 16px;border-radius:8px 8px 0 0\"><h1 style=\"color:#fff;margin:0;font-size:22px\">Apex Windows TX</h1><p style=\"color:#CE93D8;margin:6px 0 0\">Your Booking is Confirmed</p></div><div style=\"padding:24px;background:#fafafa\"><p>Hi there,</p><p>Thank you for accepting your quote of <strong>$' + parseFloat($('Validate Token').item.json.total_amount || 0).toFixed(2) + '</strong>. We are on it!</p><p><strong>What happens next:</strong></p><ol><li>We will call you within 24 hours to schedule your appointment at a time that works for you.</li><li>Our technician arrives and completes the window replacement.</li><li>An invoice will be sent after the job is done. You can pay securely online via the link in the invoice email.</li></ol><p>Questions? Call <strong>214-555-0100</strong> or reply to this email.</p><p>Thank you for choosing Apex Windows TX!</p><p style=\"font-size:12px;color:#aaa;margin-top:24px;border-top:1px solid #eee;padding-top:12px\">[TEST EMAIL] - Apex Windows TX Automation</p></div></div>' }}",
+        "options": {}
+      },
+      "id": "c007",
+      "name": "Email Customer - Booking Confirmed",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2464,
+        1296
+      ],
+      "webhookId": "6f082da8-a144-44a1-8129-d703870eac2f",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Validate Token').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "quote_accepted"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({quote_id: $('Validate Token').item.json.id}) }}"
+            }
+          ]
+        }
+      },
+      "id": "c008",
+      "name": "Log - Quote Accepted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2752,
+        1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "job-completed",
+        "options": {}
+      },
+      "id": "d001",
+      "name": "Webhook - Job Completed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        2000
+      ],
+      "webhookId": "24e1ba7d-42d0-4622-b1c8-efe3fece3832"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.body.lead_id }}"
+      },
+      "id": "d002",
+      "name": "Check Duplicate Job",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        2000
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ ['Completed','Payment Pending','Closed Won'].includes($json.pipeline_stage) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d003",
+      "name": "IF Already Completed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        160,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Webhook - Job Completed').item.json.body.lead_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Completed"
+            }
+          ]
+        }
+      },
+      "id": "d005",
+      "name": "Update Pipeline - Completed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        2000
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead_id = $('Webhook - Job Completed').first().json.body.lead_id;\nconst marked_by = $('Webhook - Job Completed').first().json.body.marked_by || 'Alvin';\nconst yr = new Date().getFullYear();\nconst num = 'APX-' + yr + '-' + String(Math.floor(Math.random()*9000)+1000);\nconst due = new Date(Date.now()+14*86400000).toISOString().split('T')[0];\nreturn [{ json: { invoice_number: num, invoice_date: new Date().toISOString().split('T')[0], due_date: due, lead_id, marked_by } }];"
+      },
+      "id": "d006",
+      "name": "Build Invoice Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "quotes",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'lead_id=eq.' + $('Webhook - Job Completed').item.json.body.lead_id + '&status=eq.accepted' }}"
+      },
+      "id": "d007",
+      "name": "Fetch Accepted Quote",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        2000
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "invoices",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Build Invoice Data').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "quote_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "invoice_number",
+              "fieldValue": "={{ $('Build Invoice Data').item.json.invoice_number }}"
+            },
+            {
+              "fieldId": "amount_due",
+              "fieldValue": "={{ $json.total_amount }}"
+            },
+            {
+              "fieldId": "amount_paid",
+              "fieldValue": "0"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "unpaid"
+            },
+            {
+              "fieldId": "invoice_date",
+              "fieldValue": "={{ $('Build Invoice Data').item.json.invoice_date }}"
+            },
+            {
+              "fieldId": "due_date",
+              "fieldValue": "={{ $('Build Invoice Data').item.json.due_date }}"
+            }
+          ]
+        }
+      },
+      "id": "d008",
+      "name": "Create Invoice",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        2000
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Build Invoice Data').item.json.lead_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Payment Pending"
+            },
+            {
+              "fieldId": "invoice_number",
+              "fieldValue": "={{ $('Build Invoice Data').item.json.invoice_number }}"
+            },
+            {
+              "fieldId": "invoice_sent_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "d009",
+      "name": "Update Pipeline - Payment Pending",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2272,
+        1920
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $('Check Duplicate Job').item.json.email }}",
+        "subject": "={{ 'Invoice #' + $('Set Stripe Payment URL').item.json.invoice_number + ' | Due ' + $('Set Stripe Payment URL').item.json.due_date }}",
+        "html": "={{ '<div style=\"font-family:Arial;max-width:620px;margin:0 auto\"><div style=\"background:#4A148C;padding:22px 16px;border-radius:8px 8px 0 0\"><h1 style=\"color:#fff;margin:0;font-size:22px\">Apex Windows TX</h1><p style=\"color:#CE93D8;margin:6px 0 0\">Your Invoice is Ready</p></div><div style=\"padding:24px;background:#fafafa\"><p>Hi there,</p><p>Your Apex Windows service has been completed. Please find your invoice details below.</p><table style=\"width:100%;border-collapse:collapse;margin:16px 0\"><tr style=\"background:#f3e5f5\"><td style=\"padding:10px;font-weight:bold\">Invoice #</td><td style=\"padding:10px\">' + $('Set Stripe Payment URL').item.json.invoice_number + '</td></tr><tr><td style=\"padding:10px;font-weight:bold\">Amount Due</td><td style=\"padding:10px\"><strong>$' + parseFloat($('Create Invoice').item.json.amount_due || 0).toFixed(2) + '</strong></td></tr><tr style=\"background:#f3e5f5\"><td style=\"padding:10px;font-weight:bold\">Due Date</td><td style=\"padding:10px\">' + $('Set Stripe Payment URL').item.json.due_date + '</td></tr></table><div style=\"text-align:center;margin:28px 0\"><a href=\"' + $('Set Stripe Payment URL').item.json.stripe_payment_url + '\" style=\"background:#1976D2;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:bold\">Pay Now Securely</a></div><p style=\"font-size:12px;color:#666\">If the button does not work, copy this link: ' + $('Set Stripe Payment URL').item.json.stripe_payment_url + '</p><p style=\"font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px\">Thank you for choosing Apex Windows TX | [TEST EMAIL]</p></div></div>' }}",
+        "options": {}
+      },
+      "id": "d010",
+      "name": "Email Invoice",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2656,
+        1920
+      ],
+      "webhookId": "79752c49-9cfb-4371-8933-41b7b7d74c6f",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-received",
+        "options": {}
+      },
+      "id": "e001",
+      "name": "Webhook - Payment Received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        2704
+      ],
+      "webhookId": "b99ae16a-6686-47a3-8623-8c94e1eb8e2c"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "invoices",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'invoice_number=eq.' + $json.invoice_number }}"
+      },
+      "id": "e002",
+      "name": "Validate Invoice",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        2704
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "fullpay",
+              "leftValue": "={{ $json.amount_paid }}",
+              "rightValue": "={{ $json.amount_due - 0.5 }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte",
+                "name": "filter.operator.gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "e003",
+      "name": "IF Full Payment",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        256,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Payment Check Data').first().json;\nreturn [{ json: {\n  status: 'partial',\n  invoice_id: d.invoice_id,\n  lead_id: d.lead_id,\n  invoice_number: d.invoice_number,\n  amount_paid: d.amount_paid,\n  balance: d.amount_due - d.amount_paid\n} }];"
+      },
+      "id": "e004",
+      "name": "Handle Partial Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        2928
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "invoices",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Payment Check Data').item.json.invoice_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "amount_paid",
+              "fieldValue": "={{ $json.amount_paid }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "partial"
+            }
+          ]
+        }
+      },
+      "id": "e005",
+      "name": "Update Invoice Partial",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        2928
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "developer@example.com",
+        "subject": "={{ 'Partial Payment | Invoice #' + $('Handle Partial Payment').item.json.invoice_number }}",
+        "html": "={{ `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden\"><div style=\"background:#4A148C;padding:22px 28px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse\"><tr><td style=\"vertical-align:top\"><span style=\"color:#fff;font-size:20px;font-weight:bold\">Apex Windows TX</span><div style=\"color:#CE93D8;font-size:13px;margin-top:4px\">Partial Payment Received</div></td><td align=\"right\" style=\"vertical-align:top\"><span style=\"background:#7B1FA2;color:#E1BEE7;font-size:10px;font-weight:bold;padding:4px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap\">INTERNAL &bull; STAFF ONLY</span></td></tr></table></div><div style=\"padding:24px 28px;background:#fafafa\"><div style=\"background:#FFF3E0;border:1px solid #E65100;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#E65100;font-weight:bold\">&#9888; FOLLOW UP REQUIRED: Collect the outstanding balance.</div><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;border:1px solid #e8e0f5;border-radius:6px;overflow:hidden;margin:16px 0\"><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Invoice #</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Handle Partial Payment').item.json.invoice_number}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Amount Paid</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">$${parseFloat($('Handle Partial Payment').item.json.amount_paid || 0).toFixed(2)}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Balance Remaining</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">$${parseFloat($('Handle Partial Payment').item.json.balance || 0).toFixed(2)}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Payment Method</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Handle Partial Payment').item.json.payment_method || 'N/A'}</td></tr></table><p style=\"font-size:14px;color:#444;line-height:1.6;margin:0 0 10px\">Please contact the customer to arrange payment of the outstanding balance.</p><div style=\"border-top:1px solid #e8e0f5;margin-top:24px;padding-top:14px;font-size:11px;color:#bbb;text-align:center\">Apex Windows TX Automation &nbsp;&bull;&nbsp; Internal Notification</div></div></div>` }}",
+        "options": {}
+      },
+      "id": "e006",
+      "name": "Email SM - Partial Payment",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1008,
+        2928
+      ],
+      "webhookId": "7146ac1f-739e-4b7f-899d-9d83f6a18307",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "invoices",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Payment Check Data').item.json.invoice_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "paid"
+            },
+            {
+              "fieldId": "amount_paid",
+              "fieldValue": "={{ $('Payment Check Data').item.json.amount_paid }}"
+            },
+            {
+              "fieldId": "paid_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "payment_method",
+              "fieldValue": "={{ $('Payment Check Data').item.json.payment_method }}"
+            },
+            {
+              "fieldId": "transaction_id",
+              "fieldValue": "={{ $('Payment Check Data').item.json.transaction_id }}"
+            }
+          ]
+        }
+      },
+      "id": "e008",
+      "name": "Update Invoice Paid",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        2704
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Payment Check Data').item.json.lead_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Closed Won"
+            },
+            {
+              "fieldId": "closed_won_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "e009",
+      "name": "Update Pipeline - Closed Won",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        2704
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?lead_id=eq.' + $('Validate Invoice').item.json.lead_id + '&resolved=eq.false' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({resolved: true, resolved_at: new Date().toISOString()}) }}",
+        "options": {}
+      },
+      "id": "e010",
+      "name": "Resolve All Escalations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $('Fetch Lead E').item.json.email }}",
+        "subject": "Payment Received | Thank You from Apex Windows TX",
+        "html": "={{ '<div style=\"font-family:Arial;max-width:620px;margin:0 auto\"><div style=\"background:#4A148C;padding:22px 16px;border-radius:8px 8px 0 0\"><h1 style=\"color:#fff;margin:0;font-size:22px\">Apex Windows TX</h1><p style=\"color:#CE93D8;margin:6px 0 0\">Payment Received - Thank You!</p></div><div style=\"padding:24px;background:#fafafa\"><p>Hi there,</p><p>We have received your payment. Thank you for choosing Apex Windows TX!</p><table style=\"width:100%;border-collapse:collapse;margin:16px 0\"><tr style=\"background:#f3e5f5\"><td style=\"padding:10px;font-weight:bold\">Invoice #</td><td style=\"padding:10px\">' + $('Payment Check Data').item.json.invoice_number + '</td></tr><tr><td style=\"padding:10px;font-weight:bold\">Amount Paid</td><td style=\"padding:10px\"><strong>$' + parseFloat($('Payment Check Data').item.json.amount_paid || 0).toFixed(2) + '</strong></td></tr><tr style=\"background:#f3e5f5\"><td style=\"padding:10px;font-weight:bold\">Payment Method</td><td style=\"padding:10px\">' + ($('Payment Check Data').item.json.payment_method || '').charAt(0).toUpperCase() + ($('Payment Check Data').item.json.payment_method || '').slice(1) + '</td></tr></table><p style=\"margin-top:16px\">We hope you are enjoying your clear windows! If you need any future service, do not hesitate to reach out.</p><p>We would love your feedback - leaving us a Google Review helps other homeowners find trusted window service.</p><p style=\"font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:24px\">Thank you from Apex Windows TX | [TEST EMAIL]</p></div></div>' }}",
+        "options": {}
+      },
+      "id": "e011",
+      "name": "Email Customer - Payment Confirmed",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1280,
+        2704
+      ],
+      "webhookId": "12230918-e222-4110-b7bf-c57ed6e65f78",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "developer@example.com",
+        "subject": "={{ 'CLOSED WON | Invoice #' + $('Payment Check Data').item.json.invoice_number + ' | $' + parseFloat($('Payment Check Data').item.json.amount_paid || 0).toFixed(2) + ' received' }}",
+        "html": "={{ `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden\"><div style=\"background:#4A148C;padding:22px 28px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse\"><tr><td style=\"vertical-align:top\"><span style=\"color:#fff;font-size:20px;font-weight:bold\">Apex Windows TX</span><div style=\"color:#CE93D8;font-size:13px;margin-top:4px\">Closed Won &mdash; Full Payment Received</div></td><td align=\"right\" style=\"vertical-align:top\"><span style=\"background:#7B1FA2;color:#E1BEE7;font-size:10px;font-weight:bold;padding:4px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap\">INTERNAL &bull; STAFF ONLY</span></td></tr></table></div><div style=\"padding:24px 28px;background:#fafafa\"><div style=\"background:#E8F5E9;border:1px solid #2E7D32;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#2E7D32;font-weight:bold\">&#127881; Payment confirmed. All escalations resolved. WF3 triggered.</div><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;border:1px solid #e8e0f5;border-radius:6px;overflow:hidden;margin:16px 0\"><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Invoice #</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Payment Check Data').item.json.invoice_number}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Amount Received</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">$${parseFloat($('Payment Check Data').item.json.amount_paid || 0).toFixed(2)}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Payment Method</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Payment Check Data').item.json.payment_method}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Transaction ID</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Payment Check Data').item.json.transaction_id}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Lead ID</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$('Payment Check Data').item.json.lead_id}</td></tr></table><div style=\"border-top:1px solid #e8e0f5;margin-top:24px;padding-top:14px;font-size:11px;color:#bbb;text-align:center\">Apex Windows TX Automation &nbsp;&bull;&nbsp; Internal Notification &nbsp;&bull;&nbsp; [TEST EMAIL]</div></div></div>` }}",
+        "options": {}
+      },
+      "id": "e012",
+      "name": "Email SM - Closed Won",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1568,
+        2704
+      ],
+      "webhookId": "cf8e115d-3382-49b6-8e6e-641c9ea3b348",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://{{N8N_BASE_URL}}/webhook/closed-won",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({lead_id: $('Payment Check Data').item.json.lead_id,lead_email: $('Update Pipeline - Closed Won').item.json.email,lead_name: $('Update Pipeline - Closed Won').item.json.name,amount_paid: $('Payment Check Data').item.json.amount_paid}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "e014",
+      "name": "Trigger WF3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2128,
+        2704
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Payment Check Data').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "closed_won"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({ invoice_number: $('Payment Check Data').item.json.invoice_number, amount_paid: $('Payment Check Data').item.json.amount_paid, payment_method: $('Payment Check Data').item.json.payment_method, wf3_triggered: true }) }}"
+            }
+          ]
+        }
+      },
+      "id": "e015",
+      "name": "Log - Closed Won",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        2704
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst b = d.body || {};\nreturn [{ json: {\n  invoice_number: d.invoice_number || b.invoice_number,\n  amount_paid:    Number(d.amount_paid   || b.amount_paid   || 0),\n  payment_method: d.payment_method || b.payment_method || 'manual',\n  transaction_id: d.transaction_id || b.transaction_id || null\n} }];"
+      },
+      "id": "e_normalize",
+      "name": "Normalize Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "invoice_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "lead_id",
+              "value": "={{ $json.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "invoice_number",
+              "value": "={{ $json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "amount_due",
+              "value": "={{ Number($json.amount_due) }}",
+              "type": "number"
+            },
+            {
+              "id": "f5",
+              "name": "amount_paid",
+              "value": "={{ Number($('Normalize Payment').item.json.amount_paid) }}",
+              "type": "number"
+            },
+            {
+              "id": "f6",
+              "name": "payment_method",
+              "value": "={{ $('Normalize Payment').item.json.payment_method }}",
+              "type": "string"
+            },
+            {
+              "id": "f7",
+              "name": "transaction_id",
+              "value": "={{ $('Normalize Payment').item.json.transaction_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e_check_data",
+      "name": "Payment Check Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        32,
+        2704
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "stripe-payment",
+        "options": {}
+      },
+      "id": "e_stripe_in",
+      "name": "Stripe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        2912
+      ],
+      "webhookId": "c8b2f86c-a52a-440d-bcc0-4bb06d9ee09d"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nif (body.type !== 'checkout.session.completed') return [];\nconst s = body.data && body.data.object;\nif (!s || s.payment_status !== 'paid') return [];\nreturn [{ json: {\n  invoice_number: (s.metadata || {}).invoice_number,\n  amount_paid:    (s.amount_total || 0) / 100,\n  payment_method: 'stripe',\n  transaction_id: s.payment_intent || s.id\n} }];"
+      },
+      "id": "e_stripe_parse",
+      "name": "Parse Stripe Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        2912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{STRIPE_SECRET_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "product",
+              "value": "{{STRIPE_PRODUCT_ID}}"
+            },
+            {
+              "name": "unit_amount",
+              "value": "={{ String(Math.round(Number($('Fetch Accepted Quote').item.json.total_amount) * 100)) }}"
+            },
+            {
+              "name": "currency",
+              "value": "usd"
+            },
+            {
+              "name": "metadata[invoice_number]",
+              "value": "={{ $('Build Invoice Data').item.json.invoice_number }}"
+            },
+            {
+              "name": "metadata[lead_id]",
+              "value": "={{ $('Build Invoice Data').item.json.lead_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d012",
+      "name": "Create Stripe Price",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        2240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.stripe.com/v1/payment_links",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{STRIPE_SECRET_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "line_items[0][price]",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "line_items[0][quantity]",
+              "value": "1"
+            },
+            {
+              "name": "metadata[invoice_number]",
+              "value": "={{ $('Build Invoice Data').item.json.invoice_number }}"
+            },
+            {
+              "name": "metadata[lead_id]",
+              "value": "={{ $('Build Invoice Data').item.json.lead_id }}"
+            },
+            {
+              "name": "after_completion[type]",
+              "value": "hosted_confirmation"
+            },
+            {
+              "name": "after_completion[hosted_confirmation][custom_message]",
+              "value": "Thank you! Your payment has been received by Apex Windows TX. We appreciate your business!"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d013",
+      "name": "Create Stripe Payment Link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        2240
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "stripe_payment_url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "invoice_number",
+              "value": "={{ $('Build Invoice Data').item.json.invoice_number }}",
+              "type": "string"
+            },
+            {
+              "id": "s3",
+              "name": "due_date",
+              "value": "={{ $('Build Invoice Data').item.json.due_date }}",
+              "type": "string"
+            },
+            {
+              "id": "s4",
+              "name": "amount_due",
+              "value": "={{ Number($('Fetch Accepted Quote').item.json.total_amount) }}",
+              "type": "number"
+            },
+            {
+              "id": "s5",
+              "name": "lead_id",
+              "value": "={{ $('Build Invoice Data').item.json.lead_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d014",
+      "name": "Set Stripe Payment URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1856,
+        2240
+      ]
+    },
+    {
+      "parameters": {
+        "path": "quote-accept",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wfa-1",
+      "name": "Webhook - Quote Accept",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        1040
+      ],
+      "webhookId": "5d776646-0c49-461d-8af4-f58a8bd7d171"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://{{N8N_BASE_URL}}/webhook/customer-accepted",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ token: $('Webhook - Quote Accept').first().json.query.token }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "wfa-2",
+      "name": "Trigger Flow C",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16,
+        1040
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Quote Accepted - Apex Windows TX</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f4f4f4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:10px;overflow:hidden;max-width:520px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.1)}.hdr{background:#4A148C;padding:26px 30px}.hdr h1{color:#fff;font-size:21px;margin:0}.hdr p{color:#CE93D8;font-size:13px;margin:5px 0 0}.bdy{padding:34px 30px}.icon{text-align:center;font-size:52px;margin-bottom:14px;color:#2E7D32}.bdy h2{text-align:center;color:#2E7D32;font-size:21px;margin:0 0 14px}.bdy p{font-size:14px;color:#555;line-height:1.7;margin:0 0 14px}.steps{background:#f8f5ff;border:1px solid #e1d5f5;border-radius:6px;padding:16px 18px;margin:18px 0}.steps b{color:#4A148C;display:block;margin-bottom:10px;font-size:13px}.steps p{font-size:13px;color:#555;margin:0 0 8px}.steps p:last-child{margin:0}hr{border:none;border-top:1px solid #eee;margin:20px 0}.ct{font-size:13px;color:#777}.ftr{background:#f8f5ff;padding:12px 30px;border-top:1px solid #e8e0f5;text-align:center;font-size:10px;color:#bbb}</style></head><body><div class='card'><div class='hdr'><h1>Apex Windows TX</h1><p>Professional Window Services - Dallas-Fort Worth</p></div><div class='bdy'><div class='icon'>&#10003;</div><h2>Quote Accepted - Thank You!</h2><p>We have received your confirmation. A member of our team will be in touch within 1-2 business days to schedule your window service.</p><div class='steps'><b>What Happens Next</b><p>1. We will contact you to confirm a convenient installation date.</p><p>2. No preparation needed on your end unless we advise otherwise.</p><p>3. After the job is complete, you will receive an invoice for the agreed amount.</p></div><hr><p class='ct'>Have questions? Call <strong>214-555-0100</strong> or email <strong>sales-manager@example.com</strong></p></div><div class='ftr'>Apex Windows TX &nbsp;|&nbsp; apexwindowstx.com &nbsp;|&nbsp; Dallas-Fort Worth, TX</div></div></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wfa-3",
+      "name": "Respond - Accept Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "path": "quote-decline",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wfd-1",
+      "name": "Webhook - Quote Decline",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        1392
+      ],
+      "webhookId": "2e448ab3-c656-4003-b91e-b93c8be0f1f5"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "quotes",
+        "filterType": "string",
+        "filterString": "={{ 'acceptance_token=eq.' + $json.query.token + '&status=eq.sent' }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "declined"
+            }
+          ]
+        }
+      },
+      "id": "wfd-2",
+      "name": "Update Quote - Declined",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        48,
+        1504
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Quote Declined - Apex Windows TX</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f4f4f4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.card{background:#fff;border-radius:10px;overflow:hidden;max-width:520px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.1)}.hdr{background:#4A148C;padding:26px 30px}.hdr h1{color:#fff;font-size:21px;margin:0}.hdr p{color:#CE93D8;font-size:13px;margin:5px 0 0}.bdy{padding:34px 30px}.icon{text-align:center;font-size:48px;margin-bottom:14px}.bdy h2{text-align:center;color:#555;font-size:21px;margin:0 0 14px}.bdy p{font-size:14px;color:#555;line-height:1.7;margin:0 0 14px}.infobox{background:#f9f9f9;border:1px solid #eee;border-radius:6px;padding:16px 18px;margin:18px 0}.infobox p{font-size:13px;color:#666;margin:0}hr{border:none;border-top:1px solid #eee;margin:20px 0}.ct{font-size:13px;color:#777}.ftr{background:#f8f5ff;padding:12px 30px;border-top:1px solid #e8e0f5;text-align:center;font-size:10px;color:#bbb}</style></head><body><div class='card'><div class='hdr'><h1>Apex Windows TX</h1><p>Professional Window Services - Dallas-Fort Worth</p></div><div class='bdy'><div class='icon'>&#128075;</div><h2>No Problem at All</h2><p>We have received your response. Your quote has been marked as declined and no further action will be taken.</p><div class='infobox'><p>If you change your mind or would like to discuss your options, please do not hesitate to reach out. There is absolutely no obligation.</p></div><hr><p class='ct'>Reconsidering? Call <strong>214-555-0100</strong> or email <strong>sales-manager@example.com</strong></p></div><div class='ftr'>Apex Windows TX &nbsp;|&nbsp; apexwindowstx.com &nbsp;|&nbsp; Dallas-Fort Worth, TX</div></div></body></html>",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "wfd-3",
+      "name": "Respond - Decline Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.lead_id }}"
+      },
+      "id": "wfd-4",
+      "name": "Fetch Lead - Declined",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        288,
+        1504
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "developer@example.com",
+        "subject": "={{ 'Quote Declined | ' + $json.name + ' — $' + parseFloat($('Update Quote - Declined').item.json.total_amount || 0).toFixed(2) }}",
+        "html": "={{ `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0d6f0;border-radius:10px;overflow:hidden\"><div style=\"background:#4A148C;padding:22px 28px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse\"><tr><td style=\"vertical-align:top\"><span style=\"color:#fff;font-size:20px;font-weight:bold\">Apex Windows TX</span><div style=\"color:#CE93D8;font-size:13px;margin-top:4px\">Quote Declined by Customer</div></td><td align=\"right\" style=\"vertical-align:top\"><span style=\"background:#7B1FA2;color:#E1BEE7;font-size:10px;font-weight:bold;padding:4px 10px;border-radius:20px;letter-spacing:.5px;white-space:nowrap\">INTERNAL &bull; STAFF ONLY</span></td></tr></table></div><div style=\"padding:24px 28px;background:#fafafa\"><div style=\"background:#ECEFF1;border:1px solid #546E7A;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#546E7A;font-weight:bold\">&#8505; No immediate action required. Optionally follow up to re-engage.</div><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;border:1px solid #e8e0f5;border-radius:6px;overflow:hidden;margin:16px 0\"><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Customer</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$json.name}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Email</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$json.email || 'N/A'}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Phone</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$json.phone || 'N/A'}</td></tr><tr style=\"\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Quote Amount</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">$${parseFloat($('Update Quote - Declined').item.json.total_amount || 0).toFixed(2)}</td></tr><tr style=\"background:#f3e5f5;\"><td style=\"padding:9px 12px;font-size:13px;color:#555;font-weight:600;width:38%;border-bottom:1px solid #ede7f6\">Lead ID</td><td style=\"padding:9px 12px;font-size:13px;color:#333;border-bottom:1px solid #ede7f6\">${$json.id}</td></tr></table><p style=\"font-size:14px;color:#444;line-height:1.6;margin:0 0 10px\">The customer landing page has already shown a polite decline message. No further automated action will occur.</p><div style=\"border-top:1px solid #e8e0f5;margin-top:24px;padding-top:14px;font-size:11px;color:#bbb;text-align:center\">Apex Windows TX Automation &nbsp;&bull;&nbsp; Internal Notification &nbsp;&bull;&nbsp; [TEST EMAIL]</div></div></div>` }}",
+        "options": {}
+      },
+      "id": "wfd-5",
+      "name": "Email SM - Quote Declined",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        528,
+        1504
+      ],
+      "webhookId": "fc7d7c34-34fb-45b8-8498-5494f7c78c57",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Validate Token').item.json.lead_id }}"
+      },
+      "id": "c_fetch_lead",
+      "name": "Fetch Lead C",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        832,
+        1296
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('Payment Check Data').item.json.lead_id }}"
+      },
+      "id": "e_fetch_lead",
+      "name": "Fetch Lead E",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        2704
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/invoices?invoice_number=eq.' + $json.invoice_number }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "{{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{SUPABASE_JWT}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ stripe_payment_url: $json.stripe_payment_url }) }}",
+        "options": {}
+      },
+      "id": "new-save-stripe-url",
+      "name": "Save Stripe URL to Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        2032
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "escalations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Build Invoice Data').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "payment_reminder"
+            },
+            {
+              "fieldId": "due_at",
+              "fieldValue": "={{ $now.plus({days: 14}).toISO() }}"
+            },
+            {
+              "fieldId": "resolved",
+              "fieldValue": false
+            }
+          ]
+        }
+      },
+      "id": "new-pay-reminder-esc",
+      "name": "Create Payment Reminder Escalation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2464,
+        1920
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "escalations",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Set Final Total').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "quote_reminder"
+            },
+            {
+              "fieldId": "due_at",
+              "fieldValue": "={{ new Date(Date.now() + 4*24*60*60*1000).toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "new-quote-reminder-esc",
+      "name": "Create Quote Reminder Escalation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        608
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook - Manager Approved').first().json.body || $('Webhook - Manager Approved').first().json;\nconst adjusted_price = body.adjusted_price;\n\n// Pass through if no price adjustment submitted\nif (adjusted_price === undefined || adjusted_price === null || adjusted_price === '') {\n  return $input.all();\n}\n\nconst price = parseFloat(adjusted_price);\nif (isNaN(price)) {\n  throw new Error(`Invalid adjusted_price: \"${adjusted_price}\" is not a valid number.`);\n}\nif (price < 0) {\n  throw new Error(`Invalid adjusted_price: cannot be negative. Received: $${price}.`);\n}\nif (price > 25000) {\n  throw new Error(`Invalid adjusted_price: $${price.toFixed(2)} exceeds the $25,000 safety cap. Please verify the amount and contact support if correct.`);\n}\n\nreturn $input.all();"
+      },
+      "id": "b_price_val",
+      "name": "Validate Adjusted Price",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "quotes",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "acceptance_token",
+              "condition": "eq",
+              "keyValue": "={{ $json.query.token }}"
+            },
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "sent"
+            }
+          ]
+        }
+      },
+      "id": "wfa_token_check",
+      "name": "Check Quote Token",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        1040
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond_token",
+              "leftValue": "={{ $input.first().json.id || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "wfa_token_if",
+      "name": "IF Token Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        208,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "wfa_token_err",
+      "name": "Respond - Invalid Token",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        672,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Handle Partial Payment').item.json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "id": "e_fetch_lead_partial",
+      "name": "Fetch Lead - Partial Payment",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        2928
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ 'Partial Payment Received | Invoice #' + $('Handle Partial Payment').item.json.invoice_number + ' | Apex Windows TX' }}",
+        "options": {}
+      },
+      "id": "e_email_customer_partial",
+      "name": "Email Customer - Partial Payment",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        2928
+      ],
+      "webhookId": "2d10065d-8616-453e-b872-0fb8e0481292",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "job_already_completed"
+            },
+            {
+              "fieldId": "notes",
+              "fieldValue": "={{ 'Duplicate job-completed webhook ignored. Lead pipeline stage: ' + ($json.pipeline_stage || 'unknown') }}"
+            }
+          ]
+        }
+      },
+      "id": "d_log_already_completed",
+      "name": "Log - Already Completed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        2160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "manager-decline",
+        "options": {}
+      },
+      "id": "wf_md_1",
+      "name": "Webhook - Manager Decline",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        3408
+      ],
+      "webhookId": "8ce07329-356d-48c4-9c5d-7e33a840501d"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "quotes",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.quote_id }}"
+            }
+          ]
+        }
+      },
+      "id": "wf_md_2",
+      "name": "Fetch Quote - Manager Decline",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        3408
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "id": "wf_md_3",
+      "name": "Fetch Lead - Manager Decline",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        160,
+        3408
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "quotes",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Fetch Quote - Manager Decline').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "declined"
+            }
+          ]
+        }
+      },
+      "id": "wf_md_4",
+      "name": "Update Quote - Manager Declined",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        3408
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Fetch Lead - Manager Decline').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Estimate Generated"
+            }
+          ]
+        }
+      },
+      "id": "wf_md_5",
+      "name": "Update Pipeline - Estimate Generated",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        720,
+        3408
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Fetch Lead - Manager Decline').first().json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "manager_declined_quote"
+            },
+            {
+              "fieldId": "notes",
+              "fieldValue": "={{ 'Manager declined quote. Declined by: ' + ($('Webhook - Manager Decline').first().json.body.declined_by || 'Manager') + '. Lead moved back to Estimate Generated.' }}"
+            }
+          ]
+        }
+      },
+      "id": "wf_md_6",
+      "name": "Log - Manager Declined",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        3408
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "sales-manager@example.com",
+        "subject": "={{ 'Quote Declined | ' + $('Fetch Lead - Manager Decline').first().json.name + ' — ' + $('Fetch Lead - Manager Decline').first().json.address }}",
+        "options": {}
+      },
+      "id": "wf_md_7",
+      "name": "Email SM - Manager Declined",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        3408
+      ],
+      "webhookId": "c448689b-041b-43e9-b036-7a0bb0d99c2f",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Quote Approval Ready": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead A",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead A": {
+      "main": [
+        [
+          {
+            "node": "Fetch Estimate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Estimate": {
+      "main": [
+        [
+          {
+            "node": "Generate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Token": {
+      "main": [
+        [
+          {
+            "node": "Create Quote Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Quote Record": {
+      "main": [
+        [
+          {
+            "node": "Build Approval URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Approval URLs": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Quote Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Quote Pending": {
+      "main": [
+        [
+          {
+            "node": "Log - Quote Queued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Manager Approved": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead B": {
+      "main": [
+        [
+          {
+            "node": "Validate Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Price Adjusted": {
+      "main": [
+        [
+          {
+            "node": "Update Estimate Adjusted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Final Total",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Estimate Adjusted": {
+      "main": [
+        [
+          {
+            "node": "Set Final Total",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Final Total": {
+      "main": [
+        [
+          {
+            "node": "Build Quote Email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Quote Email HTML": {
+      "main": [
+        [
+          {
+            "node": "Email Quote to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Quote to Customer": {
+      "main": [
+        [
+          {
+            "node": "Update Quote - Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Quote - Sent": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Quote Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Quote Sent": {
+      "main": [
+        [
+          {
+            "node": "Create Escalation 72hr",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email SM - Quote Sent": {
+      "main": [
+        [
+          {
+            "node": "Log - Quote Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Customer Accepted": {
+      "main": [
+        [
+          {
+            "node": "Validate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead C",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Quote - Accepted": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Quote Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Quote Accepted": {
+      "main": [
+        [
+          {
+            "node": "Resolve Escalation C",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Escalation C": {
+      "main": [
+        [
+          {
+            "node": "Email SM - Quote Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email SM - Quote Accepted": {
+      "main": [
+        [
+          {
+            "node": "Email Customer - Booking Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Customer - Booking Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Log - Quote Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Job Completed": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Job": {
+      "main": [
+        [
+          {
+            "node": "IF Already Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Already Completed": {
+      "main": [
+        [
+          {
+            "node": "Log - Already Completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Pipeline - Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Completed": {
+      "main": [
+        [
+          {
+            "node": "Build Invoice Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Invoice Data": {
+      "main": [
+        [
+          {
+            "node": "Fetch Accepted Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Accepted Quote": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Invoice": {
+      "main": [
+        [
+          {
+            "node": "Create Stripe Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Payment Received": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Invoice": {
+      "main": [
+        [
+          {
+            "node": "Payment Check Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Full Payment": {
+      "main": [
+        [
+          {
+            "node": "Update Invoice Paid",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Partial Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Partial Payment": {
+      "main": [
+        [
+          {
+            "node": "Update Invoice Partial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Invoice Partial": {
+      "main": [
+        [
+          {
+            "node": "Email SM - Partial Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Invoice Paid": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Closed Won",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Closed Won": {
+      "main": [
+        [
+          {
+            "node": "Resolve All Escalations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve All Escalations": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead E",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Customer - Payment Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Email SM - Closed Won",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email SM - Closed Won": {
+      "main": [
+        [
+          {
+            "node": "Trigger WF3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger WF3": {
+      "main": [
+        [
+          {
+            "node": "Log - Closed Won",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stripe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Stripe Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Stripe Event": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payment": {
+      "main": [
+        [
+          {
+            "node": "Validate Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Check Data": {
+      "main": [
+        [
+          {
+            "node": "IF Full Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Stripe Price": {
+      "main": [
+        [
+          {
+            "node": "Create Stripe Payment Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Stripe Payment Link": {
+      "main": [
+        [
+          {
+            "node": "Set Stripe Payment URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Flow C": {
+      "main": [
+        [
+          {
+            "node": "Respond - Accept Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Quote Decline": {
+      "main": [
+        [
+          {
+            "node": "Respond - Decline Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Quote - Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Quote - Declined": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead - Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead - Declined": {
+      "main": [
+        [
+          {
+            "node": "Email SM - Quote Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead C": {
+      "main": [
+        [
+          {
+            "node": "Update Quote - Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead E": {
+      "main": [
+        [
+          {
+            "node": "Email Customer - Payment Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Stripe Payment URL": {
+      "main": [
+        [
+          {
+            "node": "Save Stripe URL to Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Stripe URL to Invoice": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Payment Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Payment Pending": {
+      "main": [
+        [
+          {
+            "node": "Create Payment Reminder Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Payment Reminder Escalation": {
+      "main": [
+        [
+          {
+            "node": "Email Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Escalation 72hr": {
+      "main": [
+        [
+          {
+            "node": "Create Quote Reminder Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Quote Reminder Escalation": {
+      "main": [
+        [
+          {
+            "node": "Email SM - Quote Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Quote": {
+      "main": [
+        [
+          {
+            "node": "Validate Adjusted Price",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Adjusted Price": {
+      "main": [
+        [
+          {
+            "node": "IF Price Adjusted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Quote Accept": {
+      "main": [
+        [
+          {
+            "node": "Check Quote Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Quote Token": {
+      "main": [
+        [
+          {
+            "node": "IF Token Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Token Valid": {
+      "main": [
+        [
+          {
+            "node": "Trigger Flow C",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - Invalid Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email SM - Partial Payment": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead - Partial Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead - Partial Payment": {
+      "main": [
+        [
+          {
+            "node": "Email Customer - Partial Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Manager Decline": {
+      "main": [
+        [
+          {
+            "node": "Fetch Quote - Manager Decline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Quote - Manager Decline": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead - Manager Decline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead - Manager Decline": {
+      "main": [
+        [
+          {
+            "node": "Update Quote - Manager Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Quote - Manager Declined": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Estimate Generated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Estimate Generated": {
+      "main": [
+        [
+          {
+            "node": "Log - Manager Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log - Manager Declined": {
+      "main": [
+        [
+          {
+            "node": "Email SM - Manager Declined",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Chicago",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}

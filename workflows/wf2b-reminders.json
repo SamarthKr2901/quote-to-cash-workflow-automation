@@ -1,0 +1,702 @@
+{
+  "name": "Apex Workflow 2B - Reminder System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "sched-01",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -800,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst todayStart = now.toISOString().slice(0, 10) + 'T00:00:00.000Z';\nconst base = 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?';\nconst orClause = '(last_notified_at.is.null,last_notified_at.lt.' + todayStart + ')';\nconst encodedOr = encodeURIComponent(orClause);\nconst quoteUrl = base + 'type=eq.quote_reminder&resolved=eq.false&notification_count=lt.3&or=' + encodedOr + '&select=id,lead_id,notification_count';\nconst payUrl = base + 'type=eq.payment_reminder&resolved=eq.false&or=' + encodedOr + '&select=id,lead_id,notification_count';\nreturn [{ json: { todayStart, quoteUrl, payUrl } }];"
+      },
+      "id": "code-date",
+      "name": "Build Date Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.quoteUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "get-q-escs",
+      "name": "Fetch Quote Reminder Escalations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.payUrl }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "get-p-escs",
+      "name": "Fetch Payment Reminder Escalations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -288,
+        480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) return [];\nreturn items.map(i => ({ json: i.json }));"
+      },
+      "id": "split-q",
+      "name": "Split Quote Escs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) return [];\nreturn items.map(i => ({ json: i.json }));"
+      },
+      "id": "split-p",
+      "name": "Split Payment Escs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/leads?id=eq.' + $json.lead_id + '&select=id,name,email' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "get-lead-q",
+      "name": "Fetch Lead Q",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/quotes?lead_id=eq.' + $('Split Quote Escs').item.json.lead_id + '&status=eq.sent&select=id,total_amount,acceptance_token&order=created_at.desc&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "get-quote",
+      "name": "Fetch Quote Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/leads?id=eq.' + $json.lead_id + '&select=id,name,email' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "get-lead-p",
+      "name": "Fetch Lead P",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/invoices?lead_id=eq.' + $('Split Payment Escs').item.json.lead_id + '&status=eq.unpaid&select=id,invoice_number,amount_due,due_date,stripe_payment_url&order=created_at.desc&limit=1' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "get-invoice",
+      "name": "Fetch Invoice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = $('Split Quote Escs').item.json;\nconst leadArr = $('Fetch Lead Q').item.json;\nconst quoteArr = $input.first().json;\nconst lead = Array.isArray(leadArr) ? (leadArr[0] || {}) : (leadArr || {});\nconst quote = Array.isArray(quoteArr) ? (quoteArr[0] || {}) : (quoteArr || {});\nconst notifCount = esc.notification_count || 0;\nconst dayNum = notifCount + 1;\nconst acceptUrl = 'https://apexwindowstx.com/quote/accept?token=' + (quote.acceptance_token || '');\nconst declineUrl = 'https://apexwindowstx.com/quote/decline?token=' + (quote.acceptance_token || '');\nreturn [{ json: { esc_id: esc.id, lead_id: esc.lead_id, notification_count: notifCount, lead_name: lead.name || 'Customer', lead_email: lead.email || '', quote_id: quote.id || '', total_amount: quote.total_amount || 0, day_num: dayNum, accept_url: acceptUrl, decline_url: declineUrl, is_last_reminder: notifCount >= 2 } }];"
+      },
+      "id": "merge-q",
+      "name": "Merge Quote Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = $('Split Payment Escs').item.json;\nconst leadArr = $('Fetch Lead P').item.json;\nconst invoiceArr = $input.first().json;\nconst lead = Array.isArray(leadArr) ? (leadArr[0] || {}) : (leadArr || {});\nconst invoice = Array.isArray(invoiceArr) ? (invoiceArr[0] || {}) : (invoiceArr || {});\nreturn [{ json: { esc_id: esc.id, lead_id: esc.lead_id, notification_count: esc.notification_count || 0, lead_name: lead.name || 'Customer', lead_email: lead.email || '', invoice_number: invoice.invoice_number || '', amount_due: invoice.amount_due || 0, due_date: invoice.due_date || '', stripe_payment_url: invoice.stripe_payment_url || '' } }];"
+      },
+      "id": "merge-p",
+      "name": "Merge Payment Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $json.lead_email }}",
+        "subject": "={{ 'Day ' + $json.day_num + ' of 3 — Your Apex Windows Quote is Still Waiting' }}",
+        "html": "={{ '<div style=\"font-family:Arial;max-width:620px;margin:0 auto\"><div style=\"background:#4A148C;padding:22px 16px;border-radius:8px 8px 0 0\"><h1 style=\"color:#fff;margin:0;font-size:22px\">Apex Windows TX</h1><p style=\"color:#CE93D8;margin:6px 0 0\">Quote Reminder &#8212; Day ' + $json.day_num + ' of 3</p></div><div style=\"padding:24px;background:#fafafa\"><p>Hi ' + $json.lead_name + ',</p><p>This is a friendly reminder that your personalised quote from Apex Windows TX is still awaiting your response.</p>' + ($json.is_last_reminder ? '<div style=\"background:#FFF3E0;border:1px solid #E65100;border-radius:6px;padding:12px 16px;margin:16px 0;font-size:13px;color:#E65100;font-weight:bold\">&#9888; Final Notice: This is your last reminder. Your quote will expire after today if no action is taken.</div>' : '') + '<table style=\"width:100%;border-collapse:collapse;margin:16px 0\"><tr style=\"background:#4A148C\"><th style=\"color:#fff;padding:9px;text-align:left\">Service</th><th style=\"color:#fff;padding:9px;text-align:right\">Quote Total</th></tr><tr><td style=\"padding:9px\">Window Service</td><td style=\"padding:9px;text-align:right\"><strong>$' + parseFloat($json.total_amount).toFixed(2) + '</strong></td></tr></table><div style=\"text-align:center;margin:28px 0\"><a href=\"' + $json.accept_url + '\" style=\"background:#2E7D32;color:#fff;padding:15px 30px;border-radius:6px;text-decoration:none;font-size:17px;font-weight:bold\">Accept This Quote</a></div><p style=\"text-align:center;font-size:12px;color:#aaa\">Not interested? <a href=\"' + $json.decline_url + '\">Decline here</a></p><p style=\"font-size:12px;text-align:center\">Questions? Call 214-555-0100</p><p style=\"font-size:11px;color:#ccc;text-align:center;margin-top:16px\"></p></div></div>' }}",
+        "options": {}
+      },
+      "id": "email-q",
+      "name": "Send Quote Reminder Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1120,
+        160
+      ],
+      "webhookId": "c0bd10f0-7035-4b91-8c6d-85b29069204d",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "developer@example.com",
+        "toEmail": "={{ $json.lead_email }}",
+        "subject": "={{ 'Payment Reminder | Invoice #' + $json.invoice_number + ' | Apex Windows TX' }}",
+        "html": "={{ '<div style=\"font-family:Arial;max-width:620px;margin:0 auto\"><div style=\"background:#4A148C;padding:22px 16px;border-radius:8px 8px 0 0\"><h1 style=\"color:#fff;margin:0;font-size:22px\">Apex Windows TX</h1><p style=\"color:#CE93D8;margin:6px 0 0\">Payment Reminder</p></div><div style=\"padding:24px;background:#fafafa\"><p>Hi there,</p><p>This is a friendly reminder that your invoice from Apex Windows TX is still outstanding. Please complete your payment at your earliest convenience.</p><table style=\"width:100%;border-collapse:collapse;margin:16px 0\"><tr style=\"background:#f3e5f5\"><td style=\"padding:10px;font-weight:bold\">Invoice #</td><td style=\"padding:10px\">' + $json.invoice_number + '</td></tr><tr><td style=\"padding:10px;font-weight:bold\">Amount Due</td><td style=\"padding:10px\"><strong>$' + parseFloat($json.amount_due || 0).toFixed(2) + '</strong></td></tr><tr style=\"background:#f3e5f5\"><td style=\"padding:10px;font-weight:bold\">Due Date</td><td style=\"padding:10px\">' + ($json.due_date || 'As soon as possible') + '</td></tr></table><div style=\"text-align:center;margin:28px 0\"><a href=\"' + $json.stripe_payment_url + '\" style=\"background:#1976D2;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:bold\">Pay Now Securely</a></div><p style=\"font-size:12px;color:#666\">If the button does not work, copy this link: ' + $json.stripe_payment_url + '</p><p style=\"font-size:12px;color:#aaa;border-top:1px solid #eee;padding-top:12px;margin-top:20px\">Thank you for choosing Apex Windows TX </p></div></div>' }}",
+        "options": {}
+      },
+      "id": "email-p",
+      "name": "Send Payment Reminder Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1120,
+        480
+      ],
+      "webhookId": "547574ca-a7c3-4ffa-b09c-7cedc77be26c",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?id=eq.' + $('Merge Quote Data').item.json.esc_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ last_notified_at: new Date().toISOString(), notification_count: $('Merge Quote Data').item.json.notification_count + 1 }) }}",
+        "options": {}
+      },
+      "id": "patch-q-esc",
+      "name": "Update Quote Escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1408,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?id=eq.' + $('Merge Payment Data').item.json.esc_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ last_notified_at: new Date().toISOString(), notification_count: $('Merge Payment Data').item.json.notification_count + 1 }) }}",
+        "options": {}
+      },
+      "id": "patch-p-esc",
+      "name": "Update Payment Escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1408,
+        480
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Merge Quote Data').item.json.notification_count }}",
+              "rightValue": 2,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-day3",
+      "name": "Is Day 3?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/quotes?id=eq.' + $('Merge Quote Data').item.json.quote_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'declined' }) }}",
+        "options": {}
+      },
+      "id": "decline-quote",
+      "name": "Auto-Decline Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1968,
+        80
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/leads?id=eq.' + $('Merge Quote Data').item.json.lead_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pipeline_stage: 'Quote Expired' }) }}",
+        "options": {}
+      },
+      "id": "expire-pipeline",
+      "name": "Update Pipeline - Quote Expired",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        80
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://{{SUPABASE_PROJECT_URL}}/rest/v1/escalations?id=eq.' + $('Merge Quote Data').item.json.esc_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ resolved: true, resolved_at: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "resolve-q-esc",
+      "name": "Resolve Quote Escalation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2528,
+        80
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Date Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Date Filter": {
+      "main": [
+        [
+          {
+            "node": "Fetch Quote Reminder Escalations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Payment Reminder Escalations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Quote Reminder Escalations": {
+      "main": [
+        [
+          {
+            "node": "Split Quote Escs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Payment Reminder Escalations": {
+      "main": [
+        [
+          {
+            "node": "Split Payment Escs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Quote Escs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Q": {
+      "main": [
+        [
+          {
+            "node": "Fetch Quote Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Payment Escs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead P",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead P": {
+      "main": [
+        [
+          {
+            "node": "Fetch Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Quote Data": {
+      "main": [
+        [
+          {
+            "node": "Merge Quote Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Invoice": {
+      "main": [
+        [
+          {
+            "node": "Merge Payment Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Quote Data": {
+      "main": [
+        [
+          {
+            "node": "Send Quote Reminder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Payment Data": {
+      "main": [
+        [
+          {
+            "node": "Send Payment Reminder Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Quote Reminder Email": {
+      "main": [
+        [
+          {
+            "node": "Update Quote Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Payment Reminder Email": {
+      "main": [
+        [
+          {
+            "node": "Update Payment Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Quote Escalation": {
+      "main": [
+        [
+          {
+            "node": "Is Day 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-Decline Quote": {
+      "main": [
+        [
+          {
+            "node": "Update Pipeline - Quote Expired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Pipeline - Quote Expired": {
+      "main": [
+        [
+          {
+            "node": "Resolve Quote Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Day 3?": {
+      "main": [
+        [
+          {
+            "node": "Auto-Decline Quote",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}

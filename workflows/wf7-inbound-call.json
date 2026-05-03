@@ -1,0 +1,266 @@
+{
+  "name": "Apex Workflow 7 - Inbound Call Lead Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "inbound-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-inbound-lead",
+      "name": "Webhook: /inbound-lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1600,
+        0
+      ],
+      "webhookId": "9900d4be-4806-444d-89b7-ce4727c2d7e5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nconst name    = (body.customer_name     || '').trim();\nconst phone   = (body.phone_number      || '').trim();\nconst email   = (body.email             || '').toLowerCase().trim();\nconst address = (body.customer_address  || '').trim();\nconst issue   = (body.issue_description || '').trim();\nconst windows = parseInt(body.window_count) || 0;\n\nconst errors = [];\nif (!name)                            errors.push('Missing customer_name');\nif (!phone)                           errors.push('Missing phone_number');\nif (!email || !email.includes('@'))   errors.push('Missing or invalid email');\nif (!address)                         errors.push('Missing customer_address');\n\nif (errors.length > 0) {\n  return [{ json: { valid: false, errors, original: body } }];\n}\n\nreturn [{\n  json: {\n    valid:         true,\n    customer_name: name,\n    phone_number:  phone,\n    email_clean:   email,\n    addr_clean:    address,\n    issue_clean:   issue.substring(0, 1000),\n    window_count:  windows\n  }\n}];"
+      },
+      "id": "code-validate",
+      "name": "Code: Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "valid-check",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "IF: Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, errors: $json.errors }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-400",
+      "name": "Respond: 400 Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "leads",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.customer_name }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $json.phone_number }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email_clean }}"
+            },
+            {
+              "fieldId": "address",
+              "fieldValue": "={{ $json.addr_clean }}"
+            },
+            {
+              "fieldId": "issue_description",
+              "fieldValue": "={{ $json.issue_clean }}"
+            },
+            {
+              "fieldId": "pipeline_stage",
+              "fieldValue": "Inbound Call - Form 2 Pending"
+            }
+          ]
+        }
+      },
+      "id": "supabase-create",
+      "name": "Supabase: Create Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        -208
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead      = $input.first().json;\nconst validated = $('Code: Validate & Normalize').first().json;\n\nreturn [{\n  json: {\n    lead_id:           lead.id,\n    customer_name:     validated.customer_name,\n    email:             validated.email_clean,\n    phone_number:      validated.phone_number,\n    address:           validated.addr_clean,\n    issue_description: validated.issue_clean,\n    window_count:      validated.window_count\n  }\n}];"
+      },
+      "id": "code-extract",
+      "name": "Code: Extract Lead ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "sales-manager@example.com",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Action Required: Hi {{ $json.customer_name.split(' ')[0] }}, complete your window details",
+        "html": "=<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head><body style=\"margin:0;padding:0;font-family:Arial,sans-serif;background:#f4f4f4\"><table width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td style=\"padding:20px 0\"><table width=\"600\" cellspacing=\"0\" cellpadding=\"0\" align=\"center\" style=\"background:#fff;border-radius:8px;overflow:hidden\"><tr><td style=\"background:#1a1a1a;padding:20px 30px\"><h1 style=\"color:#fff;margin:0;font-size:22px\">Apex Windows TX</h1></td></tr><tr><td style=\"background:#22c55e;padding:12px 30px\"><p style=\"color:#fff;margin:0;font-size:14px;font-weight:bold\">&#9889; ACTION REQUIRED &#8212; Complete Your Window Details</p></td></tr><tr><td style=\"padding:30px\"><p style=\"font-size:16px;color:#333\">Hi {{ $json.customer_name.split(' ')[0] }},</p><p style=\"font-size:15px;color:#555;line-height:1.6\">Thanks for calling Apex Windows TX! We have your details from our call.</p><p style=\"font-size:15px;color:#555;line-height:1.6\">To build your accurate quote, we need a few details about your windows &#8212; takes about 2 minutes with a few photos of each window.</p><table width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\" style=\"padding:20px 0\"><a href=\"https://windowdetails.vercel.app/\" style=\"background:#22c55e;color:#fff;text-decoration:none;padding:14px 32px;border-radius:6px;font-size:16px;font-weight:bold;display:inline-block\">Submit Window Details &#8594;</a></td></tr></table><p style=\"font-size:13px;color:#999\">Can't click the button? Copy this link: <a href=\"https://windowdetails.vercel.app/\" style=\"color:#22c55e\">https://windowdetails.vercel.app/</a></p><hr style=\"border:none;border-top:1px solid #eee;margin:20px 0\"><p style=\"font-size:13px;color:#999;margin:0\">Apex Windows TX &middot; Serving 50+ cities across Dallas-Fort Worth</p></td></tr></table></td></tr></table></body></html>",
+        "options": {}
+      },
+      "id": "email-form2",
+      "name": "Email: Send Form 2 Link",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -400,
+        -208
+      ],
+      "webhookId": "fb3c2235-db90-4ed8-a6d5-8955e5cf831a",
+      "credentials": {
+        "smtp": {
+          "name": "Gmail SMTP - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, lead_id: $('Code: Extract Lead ID').first().json.lead_id, email: $('Code: Extract Lead ID').first().json.email, customer_name: $('Code: Extract Lead ID').first().json.customer_name, message: 'Lead created. Form 2 link sent to email.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-200",
+      "name": "Respond: 200 Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -208
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: /inbound-lead": {
+      "main": [
+        [
+          {
+            "node": "Code: Validate & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Validate & Normalize": {
+      "main": [
+        [
+          {
+            "node": "IF: Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Valid?": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Create Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: 400 Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Create Lead": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract Lead ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Extract Lead ID": {
+      "main": [
+        [
+          {
+            "node": "Email: Send Form 2 Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email: Send Form 2 Link": {
+      "main": [
+        [
+          {
+            "node": "Respond: 200 Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}

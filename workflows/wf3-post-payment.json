@@ -1,0 +1,2755 @@
+{
+  "name": "Apex Workflow 3 - Post Payment Followups",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "escalations",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "type",
+              "condition": "eq",
+              "keyValue": "post_job_review_request"
+            },
+            {
+              "keyName": "resolved",
+              "condition": "eq",
+              "keyValue": "false"
+            }
+          ]
+        }
+      },
+      "id": "38791317-cc76-4c79-ae21-b97272c3e07c",
+      "name": "Supabase SELECT — Review Request Fallback",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        2240
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $items().length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "6d15f9d9-fc78-4a42-8ab5-eb486b7bdbba",
+      "name": "IF — Any Review Fallback Needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        336,
+        2240
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "c19eeae4-217f-4233-a9db-6012cf22ce27",
+      "name": "SplitInBatches — Review Fallback",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        560,
+        2240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('SplitInBatches — Review Fallback').item.json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "id": "0fbbac98-da15-48db-a4a5-512b18a7e6ff",
+      "name": "Supabase SELECT — Verify Lead Complete Stage",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        2240
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.valid_stage === true }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "30720287-961c-4932-9ea4-0c0c24b5d12e",
+      "name": "IF — Lead Stage = Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        2224
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "post_job_comms",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('SplitInBatches — Review Fallback').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "review_request"
+            },
+            {
+              "fieldId": "sent_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "09484d24-d77e-4e33-b3d8-9ccee21ec95e",
+      "name": "Supabase INSERT — Mark Review Sent (Fallback)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2384,
+        2208
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "google_review_requested_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "86604369-5f23-4bf9-8f0b-342c29fad749",
+      "name": "Supabase UPDATE — google_review_requested_at (Fallback)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2640,
+        2208
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "escalations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('SplitInBatches — Review Fallback').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "resolved",
+              "fieldValue": true
+            },
+            {
+              "fieldId": "resolved_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "post_job_review_request"
+            }
+          ]
+        }
+      },
+      "id": "94a893a4-51d5-4ca0-a754-099af02a41cf",
+      "name": "Supabase UPDATE — Resolve Review Escalation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2864,
+        2192
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const h = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })).getHours();\nreturn [{ json: { current_hour: h, within_hours: h >= 6 && h <= 22 } }];"
+      },
+      "id": "b858c4d2-d622-471d-b8d7-dc9519618692",
+      "name": "IF — Operating Hours Check (6am-10pm CST)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3232,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.within_hours }}",
+              "value2": true
+            }
+          ],
+          "number": [
+            {
+              "value1": 1,
+              "operation": "larger"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "9c8975b2-fe29-4f65-8d83-c080780af7d5",
+      "name": "IF — Within Hours?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -3008,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\n\nreturn items.filter(item => {\n  const due = new Date(item.json.due_at);\n\n  return due < now;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        2240
+      ],
+      "id": "c930e12f-a6aa-4d62-aca8-de95524ab859",
+      "name": "due_at < now"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "post_job_comms",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "id": "06dbb830-4fc7-4329-8752-b245b519e195",
+      "name": "Supabase SELECT — Already Sent Review? (Fallback Check)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        784,
+        2224
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const isEmpty =\n  items.length === 0 ||\n  !items[0].json ||\n  Object.keys(items[0].json).length === 0;\n\nreturn [{\n  json: {\n    already_sent: !isEmpty\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        2224
+      ],
+      "id": "0e14066f-8e87-4387-83fd-2f7c374d3a8c",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const validStages = [\n  \"Completed\",\n  \"Payment Pending\",\n  \"Closed Won\"\n];\n\n// Check if data exists properly\nconst hasData =\n  items.length > 0 &&\n  items[0].json &&\n  Object.keys(items[0].json).length > 0;\n\n// Get stage safely\nconst stage = hasData ? items[0].json.pipeline_stage : null;\n\n// Validate stage\nconst isValid = validStages.includes(stage);\n\nreturn [{\n  json: {\n    ...items[0]?.json,\n    valid_stage: isValid,\n    debug_stage: stage // optional (for debugging)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        2240
+      ],
+      "id": "705620ee-5a5a-4d19-9c4d-d48cefa16c7a",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "How Did We Do? — Apex Windows TX",
+        "message": "=Hi {{ $json.name }},\n\nIt was a pleasure working on your home — we truly appreciate the opportunity to help with your windows.\n\nIf you have a quick moment, we’d be incredibly grateful if you could leave us a Google review. It only takes about 30 seconds and really helps our small local business grow.\n\n👉 <a href=\"https://www.google.com/maps/place/Apex+Windows+%26+Glass/@33.2199973,-96.7113975/data=!4m6!3m5!1s0x864c3d209b1feafd:0xf5dcc2c42ae106b9!8m2!3d33.2199973!4d-96.7113975!16s%2Fg%2F11vm41rm58\" target=\"_blank\" style=\"background:#f59e0b;color:white;padding:10px 16px;text-decoration:none;border-radius:6px;display:inline-block;margin:10px 0;\">\nLeave a Google Review\n</a>\n\nNo pressure at all — we just appreciate your support!\n\nIf you ever need anything in the future, feel free to reach out anytime.\n\nBest regards,  \nAlvin & Dan  \nApex Windows TX  \n+2228459",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2128,
+        2224
+      ],
+      "id": "405d7526-11f6-4854-adf3-de25dec47e55",
+      "name": "Send Email — Google Review Request (Fallback)1",
+      "webhookId": "60eb5550-25a4-49fd-8180-c78c212c0c6f",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if current CST time is within operating hours (6am–10pm)\nconst now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));\nconst h = now.getHours();\nreturn [{\n  json: {\n    current_hour_cst: h,\n    within_hours: h >= 6 && h <= 22,\n    run_timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "b7adcb8c-40e3-42c0-9c80-dc8955c5ab8d",
+      "name": "Code — Operating Hours Check (6am–10pm CST)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3248,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "within-hours-check",
+              "leftValue": "={{ $json.within_hours }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c3cfeb58-35b8-4351-9543-28357f2b465a",
+      "name": "IF — Within Operating Hours?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -3024,
+        2368
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "escalations",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "type",
+              "condition": "eq",
+              "keyValue": "customer_not_responded"
+            },
+            {
+              "keyName": "resolved",
+              "condition": "eq",
+              "keyValue": "false"
+            }
+          ]
+        }
+      },
+      "id": "599faceb-0e09-49e8-89ef-d1b738d426c6",
+      "name": "Supabase SELECT — customer_not_responded Escalations",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        1776
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Apply all three conditions that Supabase filters can't handle natively:\n// 1. due_at < NOW()  (72 hours have passed since quote was sent)\n// 2. resolved = false  (double-check in JS for safety)\n// 3. 24hr cooldown: last_notified_at IS NULL OR last_notified_at < NOW() - 24hrs\n\nconst now = new Date();\nconst cooldownThreshold = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\nconst filtered = items.filter(item => {\n  const d = item.json;\n\n  const isNotResolved = d.resolved === false || d.resolved === 'false';\n  const isOverdue = d.due_at && new Date(d.due_at) < now;\n  const cooldownPassed =\n    !d.last_notified_at ||\n    new Date(d.last_notified_at) < cooldownThreshold;\n\n  return isNotResolved && isOverdue && cooldownPassed;\n});\n\n// Pass through filtered items\nreturn filtered.length > 0 ? filtered : [];"
+      },
+      "id": "35e228b0-d81d-473f-95fb-813f3ca533c1",
+      "name": "Code — Filter: due_at < NOW & 24hr Cooldown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "any-records-found",
+              "leftValue": "={{ $items().length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c181df5d-1475-42b9-9172-bcae580e00a9",
+      "name": "IF — Any Overdue Records Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        48,
+        1776
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "d8eb908d-78c9-4596-b5cf-7dc4ec3b6998",
+      "name": "SplitInBatches — Process One at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        528,
+        1648
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "id": "8dcfd349-7e54-481a-8678-3d8c3277346c",
+      "name": "Supabase SELECT — Fetch Lead Details",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        976,
+        1648
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "quotes",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "d84e25ee-8870-451f-a65e-7eda13f2b6e1",
+      "name": "Supabase SELECT — Fetch Quote & Accept Link",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1184,
+        1648
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=developer@example.com",
+        "subject": "=Still Thinking It Over? Your Apex Windows Quote — ${{ $('Supabase SELECT — Fetch Quote & Accept Link').item.json.total_amount }}",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height:1.6; color:#333; max-width:600px; margin:0 auto;\">\n\n<p>Hi {{ $('Supabase SELECT — Fetch Lead Details').item.json.name }},</p>\n\n<p>Just a quick, friendly follow-up — we noticed you may not have had a chance to review your quote yet, and we wanted to make sure it didn't get buried in your inbox.</p>\n\n<p><strong>Your quote is still available</strong>, and you can view or accept it anytime using the button below:</p>\n\n<p style=\"text-align:center; margin: 28px 0;\">\n  <a href=\"{{ $('Supabase SELECT — Fetch Quote & Accept Link').item.json.pdf_url }}\"\n     style=\"background-color:#1a56db; color:#fff; padding:14px 28px; text-decoration:none; border-radius:6px; display:inline-block; font-size:16px; font-weight:bold;\">\n     View &amp; Accept Your Quote\n  </a>\n</p>\n\n<p>No rush at all — we're here whenever you're ready. If you have any questions, want to tweak anything, or just want to chat through your options, feel free to reply to this email or give us a call.</p>\n\n<p>📞 <strong>(289) 546-9XXX</strong></p>\n\n<p style=\"margin-top:24px;\">Best regards,<br>\n<strong>Apex Windows TX Team</strong></p>\n\n<hr style=\"border:none; border-top:1px solid #eee; margin:28px 0;\">\n<p style=\"font-size:11px; color:#aaa;\">You're receiving this because a quote was sent to you. If you've already responded or this doesn't apply to you, please ignore this message.</p>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "e8442169-f1aa-4ae3-9ee7-daf3045cfc9a",
+      "name": "Send Email — Node 21: Follow-Up to Customer",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1408,
+        1648
+      ],
+      "webhookId": "6c577225-48f7-4763-9388-53a94a0e9884",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=developer@example.com",
+        "subject": "=📋 Follow-Up Needed: {{ $('Supabase SELECT — Fetch Lead Details').item.json.name }} hasn't accepted quote ({{ $('Code — Calc Days Since Quote Sent1').item.json.days_since }} days)",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height:1.6; color:#333; max-width:600px; margin:0 auto;\">\n\n<p>Hi,</p>\n<p>This is an automated alert — a customer has not responded to their quote and a follow-up email has just been sent to them.</p>\n\n<hr style=\"border:none; border-top:1px solid #ddd; margin:16px 0;\">\n\n<h3 style=\"margin-bottom:8px;\">👤 Customer Details</h3>\n<table style=\"border-collapse:collapse; width:100%;\">\n  <tr><td style=\"padding:4px 8px;\"><strong>Name:</strong></td><td>{{ $('Supabase SELECT — Fetch Lead Details').item.json.name }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Email:</strong></td><td>{{ $('Supabase SELECT — Fetch Lead Details').item.json.email }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Phone:</strong></td><td>{{ $('Supabase SELECT — Fetch Lead Details').item.json.phone }}</td></tr>\n</table>\n\n<h3 style=\"margin-top:20px; margin-bottom:8px;\">💰 Quote Details</h3>\n<table style=\"border-collapse:collapse; width:100%;\">\n  <tr><td style=\"padding:4px 8px;\"><strong>Quote Total:</strong></td><td>${{ $('Supabase SELECT — Fetch Quote & Accept Link').item.json.total_amount }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Quote Sent:</strong></td><td>{{ $('Code — Calc Days Since Quote Sent1').item.json.quote_sent_at }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Days Since Sent:</strong></td><td><strong>{{ $('Code — Calc Days Since Quote Sent1').item.json.days_since }} days</strong></td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Notification #:</strong></td><td>{{ ($('Code — Calc Days Since Quote Sent1').item.json.notification_count || 0) + 1 }}</td></tr>\n</table>\n\n<hr style=\"border:none; border-top:1px solid #ddd; margin:20px 0;\">\n\n<p><strong>✅ Action Taken:</strong> A friendly follow-up email was just sent to the customer.</p>\n<p><strong>📞 Recommended Next Step:</strong> Consider reaching out with a personal phone call to help move this forward.</p>\n\n<p style=\"margin-top:24px; color:#888; font-size:12px;\">— Apex Windows TX Automation System</p>\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "a4482256-cf81-4f58-b9da-54090c9e0d46",
+      "name": "Send Email — Node 22: Sales Manager Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        1648
+      ],
+      "webhookId": "f38260b3-f97d-46b6-a826-dcb18e8296af",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node 22B Logic:\n// Increment notification_count and check if >= 3 (closed-lost candidate threshold)\nconst esc = $('Code — Calc Days Since Quote Sent1').item.json;\nconst newCount = (esc.notification_count || 0) + 1;\nconst isClosedLostCandidate = newCount >= 3;\n\nreturn [{\n  json: {\n    ...esc,\n    new_notification_count: newCount,\n    is_closed_lost_candidate: isClosedLostCandidate\n  }\n}];"
+      },
+      "id": "2e17c2bb-b2d2-48ef-8aa6-7ccf23bf66c8",
+      "name": "Code — Node 22B: Check Closed-Lost Threshold",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        1648
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "escalations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_notified_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "notification_count",
+              "fieldValue": "={{ $json.new_notification_count }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "={{ $json.is_closed_lost_candidate ? 'closed_lost_candidate' : 'customer_not_responded' }}"
+            }
+          ]
+        }
+      },
+      "id": "e2418a49-cf9f-4e04-af6f-7dfab7b79d0e",
+      "name": "Supabase UPDATE — Node 22B: Escalation Notified",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        1648
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Supabase UPDATE — Node 22B: Escalation Notified').item.json.lead_id }}"
+            },
+            {
+              "fieldId": "action",
+              "fieldValue": "={{ $json.notification_count >= 3 \n  ? 'closed_lost_candidate_flagged' \n  : 'customer_no_response_followup_sent' }}"
+            },
+            {
+              "fieldId": "notification_count",
+              "fieldValue": "={{ $('Code — Node 22B: Check Closed-Lost Threshold').first().json.new_notification_count }}"
+            },
+            {
+              "fieldId": "day_since_quote",
+              "fieldValue": "={{ $('Code — Node 22B: Check Closed-Lost Threshold').item.json.days_since }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "meta_data",
+              "fieldValue": "={{ JSON.stringify({ quote_total: $('Supabase SELECT — Fetch Quote & Accept Link').item.json.total_amount, lead_name: $('Supabase SELECT — Fetch Lead Details').item.json.name, is_closed_lost_candidate: $('Code — Node 22B: Check Closed-Lost Threshold').item.json.is_closed_lost_candidate }) }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "Lead Lost"
+            }
+          ]
+        }
+      },
+      "id": "c00c7123-77b8-4cd9-90ba-edc5c36ad0c7",
+      "name": "Supabase INSERT — Activity Log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2832,
+        1664
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "b13aaab1-46fd-4362-aabe-3388eaad7501",
+      "name": "SplitInBatches — Continue Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        3104,
+        1664
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate days since quote was originally sent.\n// Quote was sent 72hrs before due_at, so: sent_at = due_at - 72hrs\nconst esc = $input.item.json;\n\nconst dueDateMs = new Date(esc.due_at).getTime();\nconst quoteSentMs = dueDateMs - (72 * 60 * 60 * 1000);\nconst daysSince = Math.max(0, Math.floor((Date.now() - quoteSentMs) / (1000 * 60 * 60 * 24)));\n\nreturn [{\n  json: {\n    ...esc,\n    days_since: daysSince,\n    quote_sent_at: new Date(quoteSentMs).toISOString()\n  }\n}];"
+      },
+      "id": "6afa86b4-2e99-4fa0-88bc-71aecbf3a641",
+      "name": "Code — Calc Days Since Quote Sent1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        1648
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "closed-lost-check",
+              "leftValue": "={{ $('Code — Node 22B: Check Closed-Lost Threshold').item.json.is_closed_lost_candidate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "43ad9586-36c5-4a9c-80cb-81bf9d39a0b3",
+      "name": "IF — 3+ Follow-ups = Closed Lost Candidate?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2288,
+        1648
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "=⚠️ Closed Lost Candidate: {{ $('Supabase SELECT — Fetch Lead Details').item.json.name }} — 3 follow-ups sent with no response",
+        "message": "=<!DOCTYPE html>\n<html>\n<body style=\"font-family: Arial, sans-serif; line-height:1.6; color:#333; max-width:600px; margin:0 auto;\">\n\n<p style=\"background:#fff3cd; border-left:4px solid #ffc107; padding:12px 16px; border-radius:4px;\">\n  ⚠️ <strong>This lead has received 3 follow-up emails with no response.</strong> Consider marking as <em>Closed Lost</em> in the CRM.\n</p>\n\n<h3 style=\"margin-top:20px;\">👤 Customer Details</h3>\n<table style=\"border-collapse:collapse; width:100%;\">\n  <tr><td style=\"padding:4px 8px;\"><strong>Name:</strong></td><td>{{ $('Supabase SELECT — Fetch Lead Details').item.json.name }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Email:</strong></td><td>{{ $('Supabase SELECT — Fetch Lead Details').item.json.email }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Phone:</strong></td><td>{{ $('Supabase SELECT — Fetch Lead Details').item.json.phone }}</td></tr>\n</table>\n\n<h3 style=\"margin-top:20px;\">💰 Quote Details</h3>\n<table style=\"border-collapse:collapse; width:100%;\">\n  <tr><td style=\"padding:4px 8px;\"><strong>Quote Total:</strong></td><td>${{ $('Supabase SELECT — Fetch Quote & Accept Link').item.json.total_amount }}</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Days Since Quote Sent:</strong></td><td>{{ $('Code — Calc Days Since Quote Sent1').item.json.days_since }} days</td></tr>\n  <tr><td style=\"padding:4px 8px;\"><strong>Total Notifications Sent:</strong></td><td>{{ $('Code — Node 22B: Check Closed-Lost Threshold').item.json.new_notification_count }}</td></tr>\n</table>\n\n<hr style=\"border:none; border-top:1px solid #ddd; margin:20px 0;\">\n\n<p><strong>📋 Recommended Action:</strong> Review this lead in the CRM and manually mark as <em>Closed Lost</em> if appropriate. No further automated follow-ups will be sent from this escalation type.</p>\n\n<p style=\"color:#888; font-size:12px;\">— Apex Windows TX Automation System</p>\n</body>\n</html>",
+        "options": {}
+      },
+      "id": "cd3cc78a-a6c4-4b12-9571-76df0bc539bd",
+      "name": "Send Email — Closed Lost Candidate Alert1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2512,
+        1536
+      ],
+      "webhookId": "294c85f9-b905-49ab-8204-a4d749be18c0",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "34cae5e0-2d68-489a-b084-4dde8fe4f482",
+              "leftValue": "={{ $json.already_sent === false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        2224
+      ],
+      "id": "b1aa00db-52dc-42df-85dd-9b15d3d2571e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "closed-won",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "91e335fa-45c7-490d-83b3-fec6433be513",
+      "name": "Webhook — /closed-won",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1392,
+        176
+      ],
+      "webhookId": "closed-won-wf3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'received' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "df274ace-5ac0-4500-96c4-46a3ca84ec51",
+      "name": "Respond 200 — Immediately",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "6e7a7838-227d-4082-a51a-a810b65d388b",
+      "name": "Wait — 30 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        176
+      ],
+      "webhookId": "f26380fa-ac21-43bc-99ec-592735eb9db4"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "post_job_comms",
+        "returnAll": true,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "0743a865-8487-4ef2-a2a0-3d14856cdba7",
+      "name": "Supabase SELECT — Check Review Already Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        176
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "post_job_comms",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Webhook — /closed-won').item.json.body.lead_id }}"
+            },
+            {
+              "fieldId": "type",
+              "fieldValue": "review_request"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "53fc4474-6cc2-4508-9f99-3cdd1a8ed462",
+      "name": "Supabase INSERT — Log Review Request",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "condition": "eq",
+              "keyValue": "={{ $('Get a row').item.json.email }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "google_review_requested_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "78573deb-7eac-4ce6-9efa-28fa579bc8b6",
+      "name": "Supabase UPDATE — google_review_requested_at",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_newsletter_sent_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "b1ea0e6b-edc5-418a-a388-f03d77038a0c",
+      "name": "Supabase UPDATE — Newsletter Enrolment",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        736,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $('Webhook — /closed-won').item.json.body.lead_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "post_sale_sequence_complete"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={{ JSON.stringify({ review_request_sent: true, newsletter_enrolled: true, amount_paid: $('Webhook — /closed-won').item.json.body.amount_paid }) }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "2f8fe90b-3197-4c88-9d79-ded02eae9326",
+      "name": "Log Activity — Post-Sale Sequence Complete",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        928,
+        160
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "Apex Windows TX — Seasonal Tips to Protect Your Windows",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n</head>\n<body style=\"font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td align=\"center\">\n\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background: #ffffff; padding: 25px; border-radius: 8px;\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"padding-bottom: 15px;\">\n              <h3 style=\"margin: 0; color: #333;\">✅ Post-Sale Sequence Completed</h3>\n            </td>\n          </tr>\n\n          <!-- Body -->\n          <tr>\n            <td style=\"font-size: 15px; color: #333;\">\n              \n              <p style=\"margin: 0 0 10px;\">\n                The post-sale automation has been successfully completed for the following customer:\n              </p>\n\n              <table style=\"width: 100%; margin-top: 15px; font-size: 14px;\">\n                <tr>\n                  <td><strong>Customer Name:</strong>{{ $('Get a row').item.json.name }}</td>\n                  <td>td>\n                </tr>\n                <tr>\n                  <td><strong>Email:</strong></td>\n                  <td>{{ $('Get a row').item.json.email }}</td>\n                </tr>\n                <tr>\n                  <td><strong>Amount Paid:</strong></td>\n                  <td>{{ $('Webhook — /closed-won').item.json.body.amount_paid }}</td>\n                </tr>\n                <tr>\n                  <td><strong>Lead ID:</strong></td>\n                  <td>{{ $('Get a row').item.json.id }}</td>\n                </tr>\n              </table>\n\n              <!-- Actions -->\n              <p style=\"margin-top: 20px;\">\n                ✔ Google Review request sent<br>\n                ✔ Customer enrolled in quarterly newsletter\n              </p>\n\n              <!-- Footer -->\n              <p style=\"margin-top: 25px; color: #555;\">\n                This is an automated notification from the Apex Windows system.\n              </p>\n\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1152,
+        160
+      ],
+      "id": "bdba99b9-20e9-41df-9cb4-98afe7007e23",
+      "name": "Send a message1",
+      "webhookId": "e87a287f-99cd-4692-b2ae-aad9f5fd40dd",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Get a row').item.json.email }}",
+        "subject": "=How Did We Do? Quick Favour — Apex Windows TX",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Review Request</title>\n</head>\n<body style=\"font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td align=\"center\">\n\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background: #ffffff; padding: 30px; border-radius: 8px;\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"text-align: center; padding-bottom: 20px;\">\n              <h2 style=\"margin: 0; color: #333;\">Apex Windows TX</h2>\n            </td>\n          </tr>\n\n          <!-- Greeting -->\n          <tr>\n            <td style=\"font-size: 16px; color: #333;\">\n              Hi {{ $('Get a row').item.json.name }},\n              <br><br>\n              It was a pleasure working with you — we truly appreciate the opportunity.\n            </td>\n          </tr>\n\n          <!-- Message -->\n          <tr>\n            <td style=\"font-size: 16px; color: #333; padding-top: 15px;\">\n              If you have a moment, we’d really appreciate a quick Google review. It only takes about 30 seconds and helps our small local business grow.\n            </td>\n          </tr>\n\n          <!-- Button -->\n          <tr>\n            <td align=\"center\" style=\"padding: 30px 0;\">\n              <a href=\"https://www.google.com/maps/place/Apex+Windows+%26+Glass/@33.2199973,-96.7113975/data=!4m6!3m5!1s0x864c3d209b1feafd:0xf5dcc2c42ae106b9!8m2!3d33.2199973!4d-96.7113975!16s%2Fg%2F11vm41rm58\" \n                 style=\"background-color: #28a745; color: #ffffff; padding: 14px 25px; text-decoration: none; border-radius: 5px; font-size: 16px;\">\n                 Leave a Google Review\n              </a>\n            </td>\n          </tr>\n\n          <!-- Closing -->\n          <tr>\n            <td style=\"font-size: 15px; color: #333;\">\n              No pressure at all — we just appreciate your support 🙌\n              <br><br>\n              Thanks again,<br>\n              Alvin & Dan<br>\n              Apex Windows TX<br>\n              📞 (214) 263-3008\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9247f367-07e9-40e5-ba02-3ffab4248592",
+      "name": "Send Email — Google Review Request1",
+      "webhookId": "e87a287f-99cd-4692-b2ae-aad9f5fd40dd",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "d1cc7c53-c5b2-4e8a-b9dd-6ada2c2018c7",
+              "leftValue": "={{ !$json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -192,
+        160
+      ],
+      "id": "e119bfb3-4a18-4e0d-8e39-1dff93731792",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "content": "# Triggered after payment → handles review request + newsletter enrollment\n# Ensures smooth post-sale experience and long-term engagement",
+        "height": 336,
+        "width": 2352
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        0
+      ],
+      "id": "c1c16a94-6897-4009-9d80-7d6d9148ccc0",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        432,
+        1248
+      ],
+      "id": "9b426d95-71c9-4287-93d2-e130db3441eb",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "[TEST] Update on Your Apex Windows Quote",
+        "message": "={{ $json.ai_message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        976
+      ],
+      "id": "36f250d0-c199-47db-b3ab-57bc49bb5221",
+      "name": "Send a message",
+      "webhookId": "46d48b8e-919e-4997-907a-69d3ffb9a230",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Write a single warm paragraph (2-3 sentences) from Apex Windows TX to a customer named {{ $('Supabase SELECT — Fetch Lead for Escalation').item.json.name }}. Their window replacement quote is taking a little longer than usual. Apologise briefly, reassure them it will be ready in the next 1-2 days. Friendly and professional. No placeholders."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1520,
+        976
+      ],
+      "id": "aab9ea8f-161b-4a25-8f7d-91a29ba10b73",
+      "name": "AI Delay Message",
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "Overdue Alert",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n</head>\n<body style=\"font-family: Arial, sans-serif; background-color: #f6f6f6; padding: 20px;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td align=\"center\">\n\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background: #ffffff; padding: 25px; border-radius: 8px; border-left: 6px solid #dc3545;\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"padding-bottom: 15px;\">\n              <h2 style=\"margin: 0; color: #dc3545;\">🚨 OVERDUE ACTION REQUIRED QUOTE APPROOVAL PENDING</h2>\n            </td>\n          </tr>\n\n          <!-- Message -->\n          <tr>\n            <td style=\"font-size: 15px; color: #333;\">\n              <p style=\"margin: 0 0 15px;\">\n                A lead requires immediate attention. The required action has not been completed within the expected timeframe.\n              </p>\n\n              <!-- Lead Details -->\n              <table style=\"width: 100%; font-size: 14px; margin-top: 10px;\">\n                <tr>\n                  <td><strong>Customer Name:</strong></td>\n                  <td></td>\n                </tr>\n                <tr>\n                  <td><strong>Email:</strong></td>\n                  <td>{{ $json.email }}</td>\n                </tr>\n                <tr>\n                  <td><strong>Phone:</strong></td>\n                  <td>{{ $json.phone }}</td>\n                </tr>\n                <tr>\n                  <td><strong>Escalation Type:</strong></td>\n                  <td></td>\n                </tr>\n                <tr>\n                  <td><strong>Hours Overdue:</strong></td>\n                  <td>{{ Math.floor((Date.now() - new Date($('Supabase SELECT — Fetch Lead for Escalation').item.json.due_at)) / (1000 * 60 * 60)) }} hrs</td>\n                </tr>\n              </table>\n\n              <!-- Warning -->\n              <p style=\"margin-top: 20px; color: #dc3545; font-weight: bold;\">\n                ACTION REQUIRED IMMEDIATELY\n              </p>\n\n              <!-- CTA -->\n              <p style=\"margin-top: 10px;\">\n                Please review this lead in the CRM and take necessary action without delay.\n              </p>\n\n              <!-- Optional CRM Link -->\n              <p style=\"margin-top: 15px;\">\n                <a href=\"https://your-crm-url/leads/{{ $('Supabase SELECT — Fetch Lead for Escalation').item.json.lead_id }}\" \n                   style=\"background-color: #dc3545; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 5px;\">\n                   View Lead in CRM\n                </a>\n              </p>\n\n              <!-- Footer -->\n              <p style=\"margin-top: 25px; color: #555;\">\n                This is an automated escalation alert from Apex Windows TX system.\n              </p>\n\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        1232
+      ],
+      "id": "f38f26d7-166b-4d24-ab6d-36f583f925dc",
+      "name": "Send Email — Sales Manager + Supervisor: OVERDUE ALERT1",
+      "webhookId": "b4b767ea-e4f0-4b55-b43c-4b93397a62ed",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        1232
+      ],
+      "id": "a4fb7f94-105f-47a7-94ce-972242a3860e",
+      "name": "get lead data",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => {\n  const data = item.json;\n\n  const validType =\n    data.type === 'quote_not_sent' ||\n    data.type === 'quote_approval_pending';\n\n  const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);\n\n  const notRecentlyNotified =\n    !data.last_notified_at ||\n    new Date(data.last_notified_at) < twelveHoursAgo;\n\n  return validType && notRecentlyNotified;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        1280
+      ],
+      "id": "2eabbd47-e22f-4eb9-a92c-fe28b1bc31ac",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "escalations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Supabase SELECT — Fetch Lead for Escalation').item.json.lead_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_notified_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            },
+            {
+              "fieldId": "notification_count",
+              "fieldValue": "={{ ($('Code — Calc Hours Overdue').item.json.notification_count || 0) + 1 }}"
+            }
+          ]
+        }
+      },
+      "id": "e9adba80-885b-43e2-8c45-99c8fb76a2d8",
+      "name": "Supabase UPDATE — Mark Escalation Notified",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        1232
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output[0].content[0].text;\nreturn [{ json: { ai_message: raw } }];"
+      },
+      "id": "bcfdbb1b-0bca-4520-b980-0a15278095e1",
+      "name": "Code — Parse AI Delay Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Code — Calc Hours Overdue').item.json.type }}",
+              "value2": "quote_approval_pending"
+            }
+          ]
+        }
+      },
+      "id": "c8a184da-6dfc-4c52-8738-16e823be7b5f",
+      "name": "IF — Type is quote_approval_pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "escalations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "lead_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.lead_id }}"
+            }
+          ]
+        }
+      },
+      "id": "f7fdab6a-5803-4e64-94a8-c9dba74697ec",
+      "name": "Supabase SELECT — Fetch Lead for Escalation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        848,
+        1232
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = $input.first().json;\nif (!esc.lead_id) return [];\nconst hoursOverdue = Math.floor((Date.now() - new Date(esc.due_at).getTime()) / 3600000);\nreturn [{ json: { ...esc, hours_overdue: hoursOverdue } }];"
+      },
+      "id": "3d409883-cd68-46f8-aa16-a164cb42fc22",
+      "name": "Code — Calc Hours Overdue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        1232
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $items().length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "536d6b9d-aa05-457b-974e-024a103d24e7",
+      "name": "IF — Any Overdue Escalations?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        32,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "escalations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "resolved",
+              "condition": "eq",
+              "keyValue": "False"
+            },
+            {
+              "keyName": "due_at",
+              "condition": "lt",
+              "keyValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "75282b6b-0013-4610-859e-a17943a3113b",
+      "name": "Supabase SELECT — Overdue 24hr Escalations",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        1280
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "bbdeb19f-deaa-49d1-961a-c554f8d603a9",
+      "name": "Schedule Trigger — Every 1 Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const h = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' })).getHours();\nreturn [{ json: { current_hour: h, within_hours: h >= 6 && h <= 22 } }];"
+      },
+      "id": "93f6118a-0df3-4881-b029-48d4691108a3",
+      "name": "IF — Operating Hours Check (6am-10pm CST)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.within_hours }}",
+              "value2": true
+            }
+          ],
+          "number": [
+            {
+              "value1": 1,
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "156357a6-2a1a-412c-bdd8-f4eab0e2310c",
+      "name": "IF — Within Hours?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1536,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "returnAll": true
+      },
+      "id": "40236561-b8e4-4101-82ca-fe520ccea278",
+      "name": "Supabase SELECT — Newsletter Due Customers",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        2688
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $items().length }}",
+              "operation": "larger"
+            }
+          ]
+        }
+      },
+      "id": "4037ae3d-ccc9-4040-9a27-2eca7c8c47d2",
+      "name": "IF — Newsletter Recipients Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        304,
+        2688
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "27147ec8-88d9-4961-910b-3c44cb3bb845",
+      "name": "SplitInBatches — Newsletter",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        576,
+        2688
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "f87dfee0-3455-405f-a9c7-3fd345ed1e3f",
+      "name": "Wait — 2 Seconds (Rate Limit)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        800,
+        2688
+      ],
+      "webhookId": "f7eaddd2-f02e-47e9-bc24-4f3fc2ec0a0c"
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "={{ $json.email }} [TEST] Apex Windows TX — Seasonal Tips to Protect Your Windows",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Apex Windows TX Newsletter</title>\n</head>\n<body style=\"margin:0; padding:0; font-family: Arial, sans-serif; background-color:#f4f4f4;\">\n\n  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f4f4f4; padding:20px;\">\n    <tr>\n      <td align=\"center\">\n\n        <!-- Main Container -->\n        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff; border-radius:8px; overflow:hidden;\">\n\n          <!-- Header -->\n          <tr>\n            <td style=\"background:#1a73e8; color:#ffffff; padding:20px; text-align:center;\">\n              <h2 style=\"margin:0;\">Apex Windows TX</h2>\n              <p style=\"margin:5px 0 0;\">Seasonal Window Care Tips</p>\n            </td>\n          </tr>\n\n          <!-- Body -->\n          <tr>\n            <td style=\"padding:25px; color:#333333; font-size:15px; line-height:1.6;\">\n\n              <p>Hi {{ $json.name }},</p>\n\n              <p>Hope everything is going great with your home!</p>\n\n              <p>Here are a few simple tips to keep your windows in great condition and avoid costly repairs:</p>\n\n              <ul style=\"padding-left:20px;\">\n                <li>If you notice fog or condensation between panes, the seal may have failed</li>\n                <li>Many foggy windows are still under IGU warranty — worth checking before replacing</li>\n                <li>Regular cleaning and inspection can extend window life</li>\n              </ul>\n\n              <p><strong>💡 Pro Tip:</strong>  \n              If your windows are starting to fog again, fixing them early can save you money.</p>\n\n              <!-- Referral Box -->\n              <table width=\"100%\" style=\"background:#f1f8ff; padding:15px; margin:20px 0; border-radius:6px;\">\n                <tr>\n                  <td style=\"text-align:center;\">\n                    <p style=\"margin:0; font-size:16px;\"><strong>🎁 Referral Offer</strong></p>\n                    <p style=\"margin:5px 0;\">Refer someone with foggy windows and get</p>\n                    <p style=\"margin:0; font-size:18px; color:#1a73e8;\"><strong>10% OFF your next service</strong></p>\n                  </td>\n                </tr>\n              </table>\n\n              <p>If you need help or want us to take a quick look, just reply to this email or call us anytime.</p>\n\n              <p style=\"margin-top:20px;\">\n                📞 (+22)89582\n              </p>\n\n              <p>Best regards,<br>\n              <strong>Apex Windows TX Team</strong></p>\n\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background:#f4f4f4; padding:15px; text-align:center; font-size:12px; color:#777;\">\n              <p style=\"margin:0;\">You’re receiving this because you worked with Apex Windows TX.</p>\n              <p style=\"margin:5px 0;\">If you prefer not to receive these emails, you can unsubscribe anytime.</p>\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        2688
+      ],
+      "id": "2ba1c551-00c1-441a-9d3f-3b0252359e0f",
+      "name": "Send Email — Quarterly Newsletter1",
+      "webhookId": "6566cd6c-4b8f-471e-b69f-cf592b601f5a",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('SplitInBatches — Newsletter').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "last_newsletter_sent_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        2688
+      ],
+      "id": "30406d3b-9e3b-4ff5-be77-df6c3e2c5ea9",
+      "name": "Update leads newsletter",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "activity_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "quarterly_newsletter_sent"
+            },
+            {
+              "fieldId": "details",
+              "fieldValue": "={\n  \"source\": \"scheduler\",\n  \"type\": \"newsletter\"\n}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        2688
+      ],
+      "id": "3021a0e6-03bc-48da-90ea-0489588f9f01",
+      "name": "Log Activity — Newsletter Sent1",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.filter(item => {\n  const data = item.json;\n\n  // ✅ Allowed stages\n  const validStages = [\n    'Completed',\n    'Payment Pending',\n    'Closed Won'\n  ];\n\n  const isValidStage = validStages.includes(data.pipeline_stage);\n\n  // ✅ Newsletter timing logic (SAFE)\n  let lastSent = null;\n\n  if (data.last_newsletter_sent_at) {\n    const parsedDate = new Date(data.last_newsletter_sent_at);\n    if (!isNaN(parsedDate)) {\n      lastSent = parsedDate;\n    }\n  }\n\n  const now = new Date();\n  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);\n\n  const isDueNewsletter = !lastSent || lastSent < ninetyDaysAgo;\n\n  return isValidStage && isDueNewsletter;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        2688
+      ],
+      "id": "fd7460c9-e2d3-4e41-a207-6bad70d65c71",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "content": "# Find leads where quote is delayed >24hrs and not resolved\n# Alert Sales Manager + send delay email to customer (if needed)\n",
+        "height": 240,
+        "width": 1872
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2784,
+        1040
+      ],
+      "id": "02d070d6-a65a-40d7-8c6d-bcb17bde89df",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# Find customers who haven’t responded 72hrs after quote sent\n# Send follow-up email + notify Sales Manager for action",
+        "height": 240,
+        "width": 1872
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3520,
+        1648
+      ],
+      "id": "b6674929-4a40-4b07-9318-1e26e394e2c6",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "# If review wasn’t sent after job completion, send it now\n# Prevent duplicates using post_job_comms check",
+        "height": 240,
+        "width": 1872
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3296,
+        2208
+      ],
+      "id": "62ff960f-7ac5-4e28-b64e-2428d386b989",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "# Find completed customers who haven’t received newsletter in 90 days\n# Send value email + update last_newsletter_sent_at to avoid repeats",
+        "height": 240,
+        "width": 1872
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2128,
+        2608
+      ],
+      "id": "553ae093-e01c-4f79-abbd-e8681db455a2",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {},
+      "id": "9a756744-d73f-4fe1-b0ea-2ad6f12d8a53",
+      "name": "Error Trigger — Scheduler Failure Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        2912
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "developer@example.com",
+        "subject": "[TEST] Flow Error",
+        "emailType": "text",
+        "message": "={{ $json.execution.error.message }} W3 final",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1040,
+        2912
+      ],
+      "id": "08638ed5-502c-46aa-b218-ead7834a1ea0",
+      "name": "Send a message2",
+      "webhookId": "015c5c61-2138-4e55-a2ed-e03120f73922",
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "=+1 2603059676",
+        "to": "=+91 7066322166",
+        "message": "={{ $('Code — Parse AI Delay Message').item.json.ai_message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2304,
+        976
+      ],
+      "id": "319444df-5b73-43c7-85a1-85ee2c1f981c",
+      "name": "Send an SMS/MMS/WhatsApp message",
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "=+1 2603059676",
+        "to": "=+91 7066322166",
+        "message": "=⚠️ CLOSED LOST: {{ $('Supabase SELECT — Fetch Lead Details').item.json.name }} — {{ $('Code — Calc Days Since Quote Sent1').item.json.days_since }} days since quote, 3+ follow-ups sent with no response. Check CRM.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        2768,
+        1488
+      ],
+      "id": "10776998-ec43-4ff0-9cff-01efb8893540",
+      "name": "Send an SMS/MMS/WhatsApp message1",
+      "credentials": {
+        "twilioApi": {
+          "name": "Twilio - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "leads",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "email",
+              "keyValue": "={{ $json.body.lead_email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        176
+      ],
+      "id": "2ad27884-9d49-4ca0-8958-d231db78e3eb",
+      "name": "Get a row",
+      "credentials": {
+        "supabaseApi": {
+          "name": "Supabase - ApexWindows"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        240,
+        1248
+      ],
+      "id": "f266056c-d6a3-4785-ad61-97483fd726a8",
+      "name": "Limit"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        256,
+        1776
+      ],
+      "id": "3da7d577-0356-4a5c-bbcd-842dc6549110",
+      "name": "Limit1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        128,
+        2240
+      ],
+      "id": "a7d26f6a-e700-4410-9a89-47ef42755f39",
+      "name": "Limit2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        128,
+        2688
+      ],
+      "id": "57fc3efa-2e5c-4223-a5e0-10532f21456a",
+      "name": "Limit3"
+    }
+  ],
+  "connections": {
+    "Supabase SELECT — Review Request Fallback": {
+      "main": [
+        [
+          {
+            "node": "due_at < now",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Any Review Fallback Needed?": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Review Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches — Review Fallback": {
+      "main": [
+        [
+          {
+            "node": "Supabase SELECT — Already Sent Review? (Fallback Check)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Verify Lead Complete Stage": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Lead Stage = Complete?": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Google Review Request (Fallback)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SplitInBatches — Review Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase INSERT — Mark Review Sent (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Supabase UPDATE — google_review_requested_at (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase UPDATE — google_review_requested_at (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Supabase UPDATE — Resolve Review Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase UPDATE — Resolve Review Escalation": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Review Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Operating Hours Check (6am-10pm CST)1": {
+      "main": [
+        [
+          {
+            "node": "IF — Within Hours?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "due_at < now": {
+      "main": [
+        [
+          {
+            "node": "Limit2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Already Sent Review? (Fallback Check)": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "IF — Lead Stage = Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Google Review Request (Fallback)1": {
+      "main": [
+        [
+          {
+            "node": "Supabase INSERT — Mark Review Sent (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Operating Hours Check (6am–10pm CST)": {
+      "main": [
+        [
+          {
+            "node": "IF — Within Operating Hours?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — customer_not_responded Escalations": {
+      "main": [
+        [
+          {
+            "node": "Code — Filter: due_at < NOW & 24hr Cooldown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Filter: due_at < NOW & 24hr Cooldown": {
+      "main": [
+        [
+          {
+            "node": "IF — Any Overdue Records Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Any Overdue Records Found?": {
+      "main": [
+        [
+          {
+            "node": "Limit1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches — Process One at a Time": {
+      "main": [
+        [
+          {
+            "node": "Code — Calc Days Since Quote Sent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Fetch Lead Details": {
+      "main": [
+        [
+          {
+            "node": "Supabase SELECT — Fetch Quote & Accept Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Fetch Quote & Accept Link": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Node 21: Follow-Up to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Node 21: Follow-Up to Customer": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Node 22: Sales Manager Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Node 22: Sales Manager Alert": {
+      "main": [
+        [
+          {
+            "node": "Code — Node 22B: Check Closed-Lost Threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Node 22B: Check Closed-Lost Threshold": {
+      "main": [
+        [
+          {
+            "node": "Supabase UPDATE — Node 22B: Escalation Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase UPDATE — Node 22B: Escalation Notified": {
+      "main": [
+        [
+          {
+            "node": "IF — 3+ Follow-ups = Closed Lost Candidate?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase INSERT — Activity Log": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Continue Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches — Continue Loop": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Process One at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Calc Days Since Quote Sent1": {
+      "main": [
+        [
+          {
+            "node": "Supabase SELECT — Fetch Lead Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — 3+ Follow-ups = Closed Lost Candidate?1": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Closed Lost Candidate Alert1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase INSERT — Activity Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Closed Lost Candidate Alert1": {
+      "main": [
+        [
+          {
+            "node": "Supabase INSERT — Activity Log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send an SMS/MMS/WhatsApp message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Review Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase SELECT — Verify Lead Complete Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook — /closed-won": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 — Immediately",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 — Immediately": {
+      "main": [
+        [
+          {
+            "node": "Wait — 30 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Check Review Already Sent": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase INSERT — Log Review Request": {
+      "main": [
+        [
+          {
+            "node": "Supabase UPDATE — google_review_requested_at",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase UPDATE — google_review_requested_at": {
+      "main": [
+        [
+          {
+            "node": "Supabase UPDATE — Newsletter Enrolment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase UPDATE — Newsletter Enrolment": {
+      "main": [
+        [
+          {
+            "node": "Log Activity — Post-Sale Sequence Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Activity — Post-Sale Sequence Complete": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Google Review Request1": {
+      "main": [
+        [
+          {
+            "node": "Supabase INSERT — Log Review Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Google Review Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase UPDATE — Newsletter Enrolment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code — Calc Hours Overdue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Delay Message": {
+      "main": [
+        [
+          {
+            "node": "Code — Parse AI Delay Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Sales Manager + Supervisor: OVERDUE ALERT1": {
+      "main": [
+        [
+          {
+            "node": "IF — Type is quote_approval_pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get lead data": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Sales Manager + Supervisor: OVERDUE ALERT1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "IF — Any Overdue Escalations?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase UPDATE — Mark Escalation Notified": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Parse AI Delay Message": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Type is quote_approval_pending?": {
+      "main": [
+        [
+          {
+            "node": "AI Delay Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase UPDATE — Mark Escalation Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Fetch Lead for Escalation": {
+      "main": [
+        [
+          {
+            "node": "get lead data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Calc Hours Overdue": {
+      "main": [
+        [
+          {
+            "node": "Supabase SELECT — Fetch Lead for Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Any Overdue Escalations?": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Overdue 24hr Escalations": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger — Every 1 Hour": {
+      "main": [
+        [
+          {
+            "node": "IF — Operating Hours Check (6am-10pm CST)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Operating Hours Check (6am-10pm CST)": {
+      "main": [
+        [
+          {
+            "node": "IF — Within Hours?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Within Hours?": {
+      "main": [
+        [
+          {
+            "node": "Supabase SELECT — Overdue 24hr Escalations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase SELECT — customer_not_responded Escalations",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase SELECT — Review Request Fallback",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Supabase SELECT — Newsletter Due Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase SELECT — Newsletter Due Customers": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF — Newsletter Recipients Found?": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches — Newsletter": {
+      "main": [
+        [
+          {
+            "node": "Wait — 2 Seconds (Rate Limit)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait — 2 Seconds (Rate Limit)": {
+      "main": [
+        [
+          {
+            "node": "Send Email — Quarterly Newsletter1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email — Quarterly Newsletter1": {
+      "main": [
+        [
+          {
+            "node": "Update leads newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update leads newsletter": {
+      "main": [
+        [
+          {
+            "node": "Log Activity — Newsletter Sent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Activity — Newsletter Sent1": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Newsletter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Limit3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger — Scheduler Failure Handler": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a row": {
+      "main": [
+        [
+          {
+            "node": "Supabase SELECT — Check Review Already Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit1": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches — Process One at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit2": {
+      "main": [
+        [
+          {
+            "node": "IF — Any Review Fallback Needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit3": {
+      "main": [
+        [
+          {
+            "node": "IF — Newsletter Recipients Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send an SMS/MMS/WhatsApp message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an SMS/MMS/WhatsApp message": {
+      "main": [
+        [
+          {
+            "node": "Supabase UPDATE — Mark Escalation Notified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}
