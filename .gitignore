@@ -1,0 +1,25 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python (sanitization scripts, if any)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node (none used here, but in case)
+node_modules/
+
+# Local env / secrets — never commit
+.env
+.env.*
+*.local
+
+# Logs / scratch
+*.log
+*.tmp
+scratch/
+wf_payload.json
