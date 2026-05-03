@@ -24,7 +24,7 @@ Fires once per closed-won transition. The deliberate 30-minute wait
 gives the SM a buffer to step in if the payment turns out to need a
 refund.
 
-```
+```text
 Webhook /closed-won
   └─► Respond 200 immediately   ← critical: WF2 times out if this is delayed
         └─► Wait 30 minutes
@@ -49,7 +49,7 @@ below) to fire for the same lead — see
 A four-branch fan-out off the operating-hours gate. Each branch handles
 a different escalation type with its own cooldown.
 
-```
+```text
 Schedule Trigger (hourly)
   └─► Operating hours check (6 AM – 10 PM CST)
         ├─► Branch 1: SM overdue escalations
@@ -60,7 +60,7 @@ Schedule Trigger (hourly)
 
 ### Branch 1 — SM overdue (`type='quote_approval_pending'`)
 
-```
+```text
 Fetch escalations where due_at < now AND resolved=false
   └─► (cooldown: skip if last_notified_at < 12 hours ago)
         └─► Loop:
@@ -78,7 +78,7 @@ Fetch escalations where due_at < now AND resolved=false
 
 The 72-hour escalation that WF2 sub-flow B inserts when a quote is sent.
 
-```
+```text
 Fetch escalations type='customer_not_responded', due_at < now, resolved=false
   └─► (cooldown: skip if last_notified_at < 24 hours ago)
         └─► Loop:
@@ -96,7 +96,7 @@ Fetch escalations type='customer_not_responded', due_at < now, resolved=false
 Backup path for when the `/closed-won` webhook didn't fire (rare, but
 possible if Stripe was offline).
 
-```
+```text
 Fetch escalations type='review_request', overdue
   └─► (no cooldown — only fires once)
         └─► Loop:
@@ -112,7 +112,7 @@ Fetch escalations type='review_request', overdue
 
 Doesn't read from `escalations`; reads directly from `leads`.
 
-```
+```text
 SELECT leads
   WHERE pipeline_stage IN ('Completed', 'Payment Pending', 'Closed Won')
     AND last_newsletter_sent_at < now - 90 days
@@ -133,7 +133,7 @@ throughput.
 n8n's `errorTrigger` node is wired to catch any unhandled failure
 *inside this workflow*. When it fires:
 
-```
+```text
 Error Trigger
   └─► Email alert to two team members
         └─► Twilio SMS to two team members

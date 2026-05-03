@@ -31,7 +31,7 @@ of those.
 ElevenLabs hits this with the full conversation transcript when the call
 hangs up.
 
-```
+```text
 Webhook
   └─► IF call connected vs missed?
   │     ├─► CONNECTED:
@@ -66,9 +66,9 @@ Used by the SM-facing CRM to filter active conversations.
 Runs while the customer is still on the call. The agent has just told
 the customer "OK, let me book that for you" — this webhook does it.
 
-```
+```text
 Webhook
-  └─► Parse &amp; validate booking (date / time / service_type)
+  └─► Parse & validate booking (date / time / service_type)
         └─► IF valid?
               └─► Build event data
                     └─► Google Calendar — create event
@@ -90,7 +90,7 @@ enforces these three values.
 Runs while the customer is on the call. The agent asks "what works for
 you, Tuesday or Wednesday?" and this webhook returns the open slots.
 
-```
+```text
 Webhook
   └─► Parse availability request (date)
         └─► IF valid?

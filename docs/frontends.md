@@ -89,7 +89,7 @@ A window is included in the submission if either the photo or the
 notes are non-empty — empty cards are dropped. The notes field is
 critical: it's the primary signal Claude uses to estimate a per-window
 price. There is no width / height / glass-type input — see
-[WF1's window-details branch](workflows/wf1-lead-capture.md#flow-b-window-details--ai-estimate-apex-window-details-v2)
+[WF1's window-details branch](workflows/wf1-lead-capture.md#flow-b-window-details-and-ai-estimate-apex-window-details-v2)
 for why.
 
 **Payload shape:**

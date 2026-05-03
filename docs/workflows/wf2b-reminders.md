@@ -16,7 +16,7 @@ on, and about invoices they haven't paid. Auto-declines a quote on day
 
 ## Flow
 
-```
+```text
 Schedule Trigger (hourly)
   └─► Build date filter (current hour window)
         ├─► Fetch quote_reminder escalations (resolved=false, due_at < now)

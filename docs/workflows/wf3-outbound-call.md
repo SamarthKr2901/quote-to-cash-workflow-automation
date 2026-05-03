@@ -18,9 +18,9 @@ daily retry cron for missed calls.
 
 ## Flow
 
-```
+```text
 Webhook /new-lead
-  └─► Validate &amp; normalize payload (E.164 phone)
+  └─► Validate & normalize payload (E.164 phone)
         └─► IF valid?
               └─► Time check (current hour in America/Chicago)
                     ├─► IF 8 AM – 8 PM CST:
@@ -32,7 +32,7 @@ Webhook /new-lead
                                 └─► Respond 200
 ```
 
-```
+```text
 Daily cron 9 AM CST
   └─► Fetch leads with call_attempts < 7 AND no conversation outcome
         └─► UPDATE leads.call_attempts++

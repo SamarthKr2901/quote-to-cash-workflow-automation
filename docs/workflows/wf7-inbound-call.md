@@ -22,9 +22,9 @@ phone a first-class entry point alongside the web form.
 
 ## Flow
 
-```
+```text
 Webhook /inbound-lead
-  └─► Validate &amp; normalize (trim, lowercase email, E.164 phone, 1000-char issue cap)
+  └─► Validate & normalize (trim, lowercase email, E.164 phone, 1000-char issue cap)
         └─► IF valid?
               ├─► Supabase: INSERT leads (pipeline_stage='Inbound Call - Form 2 Pending')
               │     └─► Code: Extract lead_id from Supabase response
@@ -80,7 +80,7 @@ WF7 inserts with `pipeline_stage = 'Inbound Call - Form 2 Pending'` —
 distinct from the web entry's `'New Lead'`. This makes inbound vs. web
 provenance trivially queryable without an extra column. Once the
 customer fills out Form 2, the standard
-[WF1](wf1-lead-capture.md#flow-b-window-details--ai-estimate-apex-window-details-v2)
+[WF1](wf1-lead-capture.md#flow-b-window-details-and-ai-estimate-apex-window-details-v2)
 window-details branch transitions the stage to
 `'Window Details Received'`, and from that point on inbound and web
 leads are indistinguishable.

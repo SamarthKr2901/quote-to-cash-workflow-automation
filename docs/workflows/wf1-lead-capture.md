@@ -1,4 +1,4 @@
-# WF1 — Lead Capture &amp; Validation
+# WF1 — Lead Capture & Validation
 
 [← back to README](../../README.md) · [← workflow index](README.md)
 
@@ -18,7 +18,7 @@ both share the same lead-lookup helpers and activity logging.
 
 ## Flow A: lead intake (`/apex-lead-v2`)
 
-```
+```text
 Webhook
   └─► Map webhook to form fields
         └─► Dispatch to outbound voice agent (HTTP POST → /new-lead, fire-and-forget)
@@ -55,9 +55,9 @@ Key points:
   customer hears from us within minutes whether or not they open the
   email.
 
-## Flow B: window details &amp; AI estimate (`/apex-window-details-v2`)
+## Flow B: window details and AI estimate (`/apex-window-details-v2`)
 
-```
+```text
 Webhook (multipart)
   └─► Lookup lead by email
         └─► Validate file sizes (≤5MB per photo)

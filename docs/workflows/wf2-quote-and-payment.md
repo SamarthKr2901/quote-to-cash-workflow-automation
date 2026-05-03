@@ -1,4 +1,4 @@
-# WF2 — Quote Approval &amp; Payment
+# WF2 — Quote Approval & Payment
 
 [← back to README](../../README.md) · [← workflow index](README.md)
 
@@ -31,7 +31,7 @@ Why these all live on one workflow: see
 
 WF1 calls this immediately after the estimate PDF is uploaded.
 
-```
+```text
 Webhook
   └─► Fetch Lead A (by id)
         └─► Fetch Estimate (by lead_id, status=pending_review)
@@ -53,7 +53,7 @@ adjustments.
 The SM clicks Approve in the CRM. CRM POSTs `{quote_id, lead_id,
 approved_by, adjusted_price?}`.
 
-```
+```text
 Webhook
   └─► Fetch Lead B
         └─► Validate Quote (SELECT quotes WHERE id=? AND status='pending_approval')
@@ -82,7 +82,7 @@ auto-decline at day 3); [WF3 Post-Payment](wf3-post-payment.md) handles
 The quote email contains two links the customer can click without
 logging in:
 
-```
+```text
 {{COMPANY_DOMAIN}}/quote/accept?token=<64-char-hex>
 {{COMPANY_DOMAIN}}/quote/decline?token=<64-char-hex>
 ```
@@ -130,7 +130,7 @@ that updates state (triggered internally by C2 so the page can return
 fast), and **C3** is the decline GET (which shortcuts and updates state
 inline because there's no async work to defer).
 
-```
+```text
 [customer clicks Accept link in email]
   │
   ├─► GET /quote-accept?token=…   (Webhook - Quote Accept)
@@ -150,7 +150,7 @@ inline because there's no async work to defer).
                                                         └─► INSERT activity_log
 ```
 
-```
+```text
 [customer clicks Decline link in email]
   │
   └─► GET /quote-decline?token=…   (Webhook - Quote Decline)
@@ -165,7 +165,7 @@ inline because there's no async work to defer).
 The SM marks the job complete in the CRM after the install. WF2 then
 generates the invoice and the Stripe payment link.
 
-```
+```text
 Webhook
   └─► Check duplicate job (was this lead already marked complete?)
         └─► IF already completed → silent dead-end (known issue, see below)
@@ -191,7 +191,7 @@ for a fixed amount, Payment Links wraps it in Stripe's hosted checkout.
 Two webhooks feed into this. The Stripe one is the primary path; the
 manual one exists for cash / off-platform payments the SM enters by hand.
 
-```
+```text
 [Stripe checkout.session.completed]
   └─► Stripe Webhook
         └─► Parse Stripe Event (filter to checkout.session.completed only)

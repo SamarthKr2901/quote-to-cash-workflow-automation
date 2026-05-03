@@ -7,8 +7,8 @@ Seven n8n workflows make up the system. They live as JSON exports in
 
 | # | Workflow | Triggers | Nodes | What it does |
 |---|---|---|---|---|
-| WF1 | [Lead Capture &amp; Validation](wf1-lead-capture.md) | 2 webhooks | 55 | Form 1 + Form 2 entry, dedup, AI estimate, PDF generation |
-| WF2 | [Quote Approval &amp; Payment](wf2-quote-and-payment.md) | 9 webhooks | 85 | Quote lifecycle: SM approve → customer accept → invoice → Stripe → closed-won. The deepest piece of the system. |
+| WF1 | [Lead Capture & Validation](wf1-lead-capture.md) | 2 webhooks | 55 | Form 1 + Form 2 entry, dedup, AI estimate, PDF generation |
+| WF2 | [Quote Approval & Payment](wf2-quote-and-payment.md) | 9 webhooks | 85 | Quote lifecycle: SM approve → customer accept → invoice → Stripe → closed-won. The deepest piece of the system. |
 | WF2B | [Reminder System](wf2b-reminders.md) | hourly cron | 20 | Quote reminders, payment reminders, day-3 auto-decline |
 | WF3 Outbound | [Outbound Call](wf3-outbound-call.md) | 1 webhook + daily cron | 11 | ElevenLabs voice agent dispatch, OOH SMS fallback, retry loop |
 | WF3 Post-Call | [Post-Call Processes](wf3-post-call.md) | 4 webhooks + 3 schedules | 86 | Transcript analysis, appointment booking + availability, reminder crons |

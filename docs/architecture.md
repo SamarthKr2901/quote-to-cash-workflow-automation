@@ -208,7 +208,7 @@ sits outside the diagram.
 The `leads.pipeline_stage` column is a string-valued state machine. Its
 canonical values flow as:
 
-```
+```text
 New Lead                              ─┐
                                        ├─► Window Details Received ─► Estimate Generated
 Inbound Call - Form 2 Pending         ─┘                                      │
@@ -233,7 +233,7 @@ that scan for active leads.
 Workflows talk to each other in exactly one way: HTTP webhooks on the same
 n8n instance. There is no shared state in memory and no message queue.
 
-```
+```text
 WF1 ──POST /quote-approval-ready──► WF2
 WF1 ──POST /new-lead─────────────► WF3 Outbound
 WF2 ──POST /closed-won───────────► WF3 Post-Payment

@@ -145,7 +145,7 @@ escalating to "Closed Lost candidate" alerts after three contacts.
 
 ## What's in this repo
 
-```
+```text
 quote-to-cash-workflow-automation/
 ├── README.md                  ← you are here
 ├── LICENSE                    ← MIT
@@ -205,7 +205,7 @@ trade-offs:
   photos and customer-written notes, with `pricing_config` as the
   price floor. Manual SM adjustment is supported via
   `quotes.adjusted_total`.
-  [details →](docs/workflows/wf1-lead-capture.md#flow-b-window-details--ai-estimate-apex-window-details-v2)
+  [details →](docs/workflows/wf1-lead-capture.md#flow-b-window-details-and-ai-estimate-apex-window-details-v2)
 - **Voice agent webhook chain** — inbound and outbound voice agents
   share one toolset (booking, availability, status) backed by webhooks
   in WF3 Post-Call. The inbound agent additionally captures `lead_id`
