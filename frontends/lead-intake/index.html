@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Windows TX — Get a Free Quote</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #1565C0;
+    --blue-dark: #0D47A1;
+    --blue-light: #E3F2FD;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --border: #e2e8f0;
+    --error: #dc2626;
+    --success: #16a34a;
+    --white: #ffffff;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8f4fd 50%, #f0f9ff 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  .card {
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(21, 101, 192, 0.12), 0 8px 20px rgba(0,0,0,0.06);
+    width: 100%;
+    max-width: 560px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
+    padding: 36px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-header::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+  }
+
+  .card-header::after {
+    content: '';
+    position: absolute;
+    bottom: -20px; left: 40px;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--white);
+    margin-bottom: 6px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    position: relative;
+    z-index: 1;
+  }
+
+  .card-body { padding: 40px; }
+
+  .form-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .form-desc {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+
+  .call-cta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--blue-light);
+    border: 1.5px solid rgba(21,101,192,0.18);
+    border-radius: 10px;
+    padding: 11px 16px;
+    margin-bottom: 24px;
+  }
+
+  .call-cta span {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .call-cta a {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+
+  .call-cta a:hover { text-decoration: underline; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .form-group { margin-bottom: 20px; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  label span { color: var(--error); margin-left: 2px; }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: #fafbff;
+    transition: all 0.2s;
+    outline: none;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--blue);
+    background: var(--white);
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.08);
+  }
+
+  input.error, select.error, textarea.error { border-color: var(--error); }
+
+  textarea { resize: vertical; min-height: 90px; }
+
+  .error-msg {
+    font-size: 12px;
+    color: var(--error);
+    margin-top: 4px;
+    display: none;
+  }
+
+  .error-msg.show { display: block; }
+
+  /* Phone field: country code + number side by side */
+  .phone-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .phone-input-row select {
+    flex: 0 0 140px;
+    padding-right: 8px;
+  }
+
+  .phone-input-row input {
+    flex: 1;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
+    color: var(--white);
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(21, 101, 192, 0.35); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+    display: none;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .alert {
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 20px;
+    display: none;
+  }
+
+  .alert.error { background: #fef2f2; border: 1px solid #fecaca; color: var(--error); }
+  .alert.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: var(--success); }
+  .alert.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <div class="logo">Apex Windows TX</div>
+    <div class="subtitle">Window Service Experts — Dallas-Fort Worth</div>
+  </div>
+  <div class="card-body">
+    <h2 class="form-title">Get a Free Quote</h2>
+    <p class="form-desc">Tell us about your window issue and we'll prepare a personalised estimate within 1 business day.</p>
+
+    <div class="call-cta">
+      <span>📞 Prefer to talk?</span>
+      <a href="tel:+15555550100">+1 (555) 555-0100</a>
+      <span>— call us to get a quote</span>
+    </div>
+
+    <div class="alert error" id="alertError"></div>
+    <div class="alert success" id="alertSuccess"></div>
+
+    <form id="leadForm" novalidate>
+      <div class="form-row">
+        <div class="form-group">
+          <label>First Name <span>*</span></label>
+          <input type="text" id="firstName" placeholder="John">
+          <div class="error-msg" id="firstNameErr">Required</div>
+        </div>
+        <div class="form-group">
+          <label>Last Name <span>*</span></label>
+          <input type="text" id="lastName" placeholder="Smith">
+          <div class="error-msg" id="lastNameErr">Required</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Email Address <span>*</span></label>
+        <input type="email" id="email" placeholder="john@email.com">
+        <div class="error-msg" id="emailErr">Valid email required</div>
+      </div>
+
+      <div class="form-group">
+        <label>Phone Number <span>*</span></label>
+        <div class="phone-input-row">
+          <select id="countryCode">
+            <option value="+1">+1 (US/CA)</option>
+            <option value="+7">+7 (RU)</option>
+            <option value="+20">+20 (EG)</option>
+            <option value="+27">+27 (ZA)</option>
+            <option value="+30">+30 (GR)</option>
+            <option value="+31">+31 (NL)</option>
+            <option value="+32">+32 (BE)</option>
+            <option value="+33">+33 (FR)</option>
+            <option value="+34">+34 (ES)</option>
+            <option value="+36">+36 (HU)</option>
+            <option value="+39">+39 (IT)</option>
+            <option value="+40">+40 (RO)</option>
+            <option value="+41">+41 (CH)</option>
+            <option value="+43">+43 (AT)</option>
+            <option value="+44">+44 (GB)</option>
+            <option value="+45">+45 (DK)</option>
+            <option value="+46">+46 (SE)</option>
+            <option value="+47">+47 (NO)</option>
+            <option value="+48">+48 (PL)</option>
+            <option value="+49">+49 (DE)</option>
+            <option value="+51">+51 (PE)</option>
+            <option value="+52">+52 (MX)</option>
+            <option value="+53">+53 (CU)</option>
+            <option value="+54">+54 (AR)</option>
+            <option value="+55">+55 (BR)</option>
+            <option value="+56">+56 (CL)</option>
+            <option value="+57">+57 (CO)</option>
+            <option value="+58">+58 (VE)</option>
+            <option value="+60">+60 (MY)</option>
+            <option value="+61">+61 (AU)</option>
+            <option value="+62">+62 (ID)</option>
+            <option value="+63">+63 (PH)</option>
+            <option value="+64">+64 (NZ)</option>
+            <option value="+65">+65 (SG)</option>
+            <option value="+66">+66 (TH)</option>
+            <option value="+81">+81 (JP)</option>
+            <option value="+82">+82 (KR)</option>
+            <option value="+84">+84 (VN)</option>
+            <option value="+86">+86 (CN)</option>
+            <option value="+90">+90 (TR)</option>
+            <option value="+91">+91 (IN)</option>
+            <option value="+92">+92 (PK)</option>
+            <option value="+93">+93 (AF)</option>
+            <option value="+94">+94 (LK)</option>
+            <option value="+95">+95 (MM)</option>
+            <option value="+98">+98 (IR)</option>
+            <option value="+212">+212 (MA)</option>
+            <option value="+213">+213 (DZ)</option>
+            <option value="+216">+216 (TN)</option>
+            <option value="+218">+218 (LY)</option>
+            <option value="+220">+220 (GM)</option>
+            <option value="+221">+221 (SN)</option>
+            <option value="+234">+234 (NG)</option>
+            <option value="+254">+254 (KE)</option>
+            <option value="+255">+255 (TZ)</option>
+            <option value="+256">+256 (UG)</option>
+            <option value="+260">+260 (ZM)</option>
+            <option value="+263">+263 (ZW)</option>
+            <option value="+351">+351 (PT)</option>
+            <option value="+352">+352 (LU)</option>
+            <option value="+353">+353 (IE)</option>
+            <option value="+354">+354 (IS)</option>
+            <option value="+355">+355 (AL)</option>
+            <option value="+356">+356 (MT)</option>
+            <option value="+358">+358 (FI)</option>
+            <option value="+380">+380 (UA)</option>
+            <option value="+381">+381 (RS)</option>
+            <option value="+385">+385 (HR)</option>
+            <option value="+386">+386 (SI)</option>
+            <option value="+420">+420 (CZ)</option>
+            <option value="+421">+421 (SK)</option>
+            <option value="+502">+502 (GT)</option>
+            <option value="+503">+503 (SV)</option>
+            <option value="+504">+504 (HN)</option>
+            <option value="+505">+505 (NI)</option>
+            <option value="+506">+506 (CR)</option>
+            <option value="+507">+507 (PA)</option>
+            <option value="+591">+591 (BO)</option>
+            <option value="+593">+593 (EC)</option>
+            <option value="+595">+595 (PY)</option>
+            <option value="+598">+598 (UY)</option>
+            <option value="+880">+880 (BD)</option>
+            <option value="+886">+886 (TW)</option>
+            <option value="+960">+960 (MV)</option>
+            <option value="+961">+961 (LB)</option>
+            <option value="+962">+962 (JO)</option>
+            <option value="+963">+963 (SY)</option>
+            <option value="+964">+964 (IQ)</option>
+            <option value="+965">+965 (KW)</option>
+            <option value="+966">+966 (SA)</option>
+            <option value="+967">+967 (YE)</option>
+            <option value="+968">+968 (OM)</option>
+            <option value="+971">+971 (AE)</option>
+            <option value="+972">+972 (IL)</option>
+            <option value="+973">+973 (BH)</option>
+            <option value="+974">+974 (QA)</option>
+            <option value="+975">+975 (BT)</option>
+            <option value="+976">+976 (MN)</option>
+            <option value="+977">+977 (NP)</option>
+            <option value="+992">+992 (TJ)</option>
+            <option value="+993">+993 (TM)</option>
+            <option value="+994">+994 (AZ)</option>
+            <option value="+995">+995 (GE)</option>
+            <option value="+996">+996 (KG)</option>
+            <option value="+998">+998 (UZ)</option>
+          </select>
+          <input type="tel" id="phone" placeholder="214-555-0192">
+        </div>
+        <div class="error-msg" id="phoneErr">Required</div>
+      </div>
+
+      <div class="form-group">
+        <label>Street Address <span>*</span></label>
+        <input type="text" id="streetAddress" placeholder="123 Oak Street">
+        <div class="error-msg" id="streetAddressErr">Required</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>City <span>*</span></label>
+          <input type="text" id="city" placeholder="Frisco">
+          <div class="error-msg" id="cityErr">Required</div>
+        </div>
+        <div class="form-group">
+          <label>Number of Windows <span>*</span></label>
+          <input type="number" id="numWindows" placeholder="3" min="1" max="10">
+          <div class="error-msg" id="numWindowsErr">Required (max 10)</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Describe Your Issue <span>*</span></label>
+        <textarea id="issueDescription" placeholder="e.g. Three foggy windows in living room, one cracked in kitchen..."></textarea>
+        <div class="error-msg" id="issueDescriptionErr">Required</div>
+      </div>
+
+      <button type="submit" class="btn" id="submitBtn">
+        <span class="spinner" id="spinner"></span>
+        <span id="btnText">Get My Free Quote →</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+// In production this points at the live n8n webhook.
+// Sanitized for the public showcase repo — replace before deploying.
+const N8N_WEBHOOK = 'https://{{N8N_BASE_URL}}/webhook/apex-lead-v2';
+
+function val(id) { return document.getElementById(id).value.trim(); }
+function showErr(id, show) {
+  const el = document.getElementById(id);
+  if (el) el.classList[show ? 'add' : 'remove']('error');
+  const err = document.getElementById(id + 'Err');
+  if (err) err.classList[show ? 'add' : 'remove']('show');
+}
+
+function buildE164Phone() {
+  const code = document.getElementById('countryCode').value;
+  const digits = val('phone').replace(/\D/g, '');
+  return code + digits;
+}
+
+function validate() {
+  let ok = true;
+  const fields = ['firstName','lastName','streetAddress','city','issueDescription'];
+  fields.forEach(f => { const v = !val(f); showErr(f, v); if(v) ok = false; });
+
+  const email = val('email');
+  const emailInvalid = !email || !email.includes('@');
+  showErr('email', emailInvalid);
+  if(emailInvalid) ok = false;
+
+  const phoneDigits = val('phone').replace(/\D/g, '');
+  const phoneInvalid = !phoneDigits;
+  showErr('phone', phoneInvalid);
+  if(phoneInvalid) ok = false;
+
+  const nw = val('numWindows');
+  const nwInvalid = !nw || parseInt(nw) < 1 || parseInt(nw) > 10;
+  showErr('numWindows', nwInvalid);
+  if(nwInvalid) ok = false;
+
+  return ok;
+}
+
+document.getElementById('leadForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!validate()) return;
+
+  const btn = document.getElementById('submitBtn');
+  const spinner = document.getElementById('spinner');
+  const btnText = document.getElementById('btnText');
+  const alertError = document.getElementById('alertError');
+  const alertSuccess = document.getElementById('alertSuccess');
+
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  btnText.textContent = 'Submitting...';
+  alertError.classList.remove('show');
+
+  const payload = {
+    name: val('firstName') + ' ' + val('lastName'),
+    phone: buildE164Phone(),
+    email: val('email'),
+    address: val('streetAddress') + ', ' + val('city') + ', TX',
+    issue_description: val('issueDescription'),
+    num_windows: val('numWindows')
+  };
+
+  try {
+    const res = await fetch(N8N_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      alertSuccess.textContent = '✅ Thank you! Your request has been received. We\'ll prepare your estimate within 1 business day.';
+      alertSuccess.classList.add('show');
+      document.getElementById('leadForm').style.display = 'none';
+    } else {
+      throw new Error('Submission failed. Please try again.');
+    }
+  } catch (err) {
+    alertError.textContent = '❌ ' + (err.message || 'Something went wrong. Please try again.');
+    alertError.classList.add('show');
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    btnText.textContent = 'Get My Free Quote →';
+  }
+});
+</script>
+</body>
+</html>

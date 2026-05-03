@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex Windows TX — Window Details</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue: #1565C0;
+    --blue-dark: #0D47A1;
+    --blue-light: #E3F2FD;
+    --text: #1a1a2e;
+    --muted: #6b7280;
+    --border: #e2e8f0;
+    --error: #dc2626;
+    --success: #16a34a;
+    --white: #ffffff;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8f4fd 50%, #f0f9ff 100%);
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  .card {
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(21, 101, 192, 0.12), 0 8px 20px rgba(0,0,0,0.06);
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    overflow: hidden;
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
+    padding: 36px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-header::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--white);
+    margin-bottom: 6px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    position: relative;
+    z-index: 1;
+  }
+
+  .card-body { padding: 40px; }
+
+  .form-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .form-desc {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  .window-card {
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 20px;
+    background: #fafbff;
+    transition: border-color 0.2s;
+  }
+
+  .window-card:focus-within { border-color: var(--blue); }
+
+  .window-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .window-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--blue-light);
+  }
+
+  .form-group { margin-bottom: 16px; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  input[type="text"], input[type="email"], select, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--white);
+    transition: all 0.2s;
+    outline: none;
+  }
+
+  input[type="text"]:focus, input[type="email"]:focus, select:focus, textarea:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.08);
+  }
+
+  input.error { border-color: var(--error); }
+
+  .error-msg { font-size: 12px; color: var(--error); margin-top: 4px; display: none; }
+  .error-msg.show { display: block; }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  .file-upload {
+    position: relative;
+    width: 100%;
+  }
+
+  .file-upload input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+  }
+
+  .file-upload-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    background: var(--white);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .file-upload:hover .file-upload-label {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: var(--blue-light);
+  }
+
+  .file-upload-label .icon { font-size: 18px; }
+
+  .file-name {
+    font-size: 12px;
+    color: var(--success);
+    margin-top: 4px;
+    display: none;
+  }
+
+  .file-size-err {
+    font-size: 12px;
+    color: var(--error);
+    margin-top: 4px;
+    display: none;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0 20px;
+  }
+
+  .issue-type-select { background: var(--white); }
+
+  .btn {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
+    color: var(--white);
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(21, 101, 192, 0.35); }
+  .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--blue-light);
+    border-radius: 10px;
+    margin: 16px 0;
+    display: none;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), var(--blue-dark));
+    border-radius: 10px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  .alert {
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-bottom: 20px;
+    display: none;
+  }
+
+  .alert.error { background: #fef2f2; border: 1px solid #fecaca; color: var(--error); }
+  .alert.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: var(--success); }
+  .alert.show { display: block; }
+
+  .note {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 24px;
+    padding: 10px 14px;
+    background: var(--blue-light);
+    border-radius: 8px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <div class="logo">Apex Windows TX</div>
+    <div class="subtitle">Window Service Experts — Dallas-Fort Worth</div>
+  </div>
+  <div class="card-body">
+    <h2 class="form-title">Window Details</h2>
+    <p class="form-desc">Upload photos of each window and describe the issue. Our team uses this to prepare your estimate.</p>
+
+    <div class="note">
+      📎 Upload up to 10 window photos (max 5MB each). More than 10 windows? Call us at <strong>(214) 000-0000</strong>.
+    </div>
+
+    <div class="alert error" id="alertError"></div>
+    <div class="alert success" id="alertSuccess"></div>
+
+    <form id="windowForm" novalidate>
+
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Your Email Address <span style="color:#dc2626">*</span></label>
+        <input type="email" id="submitterEmail" placeholder="john@email.com">
+        <div class="error-msg" id="submitterEmailErr">Valid email required</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:24px">
+        <label>Issue Type <span style="color:#dc2626">*</span></label>
+        <select id="issueType" class="issue-type-select" required>
+          <option value="">— Select Issue Type —</option>
+          <option value="Foggy/Broken">Foggy / Broken Glass (IGU)</option>
+          <option value="Full Window Replacement">Full Window Replacement</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="otherDescGroup" style="display:none;margin-bottom:24px">
+        <label>Please Describe the Issue</label>
+        <input type="text" id="otherDescription" placeholder="Describe what's wrong...">
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Windows 1-10 -->
+      <div id="windowsContainer"></div>
+
+      <div class="progress-bar" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+
+      <button type="submit" class="btn" id="submitBtn">Submit Window Details →</button>
+    </form>
+  </div>
+</div>
+
+<script>
+// In production this points at the live n8n webhook.
+// Sanitized for the public showcase repo — replace before deploying.
+const N8N_WEBHOOK = 'https://{{N8N_BASE_URL}}/webhook/apex-window-details-v2';
+const MAX_SIZE = 5 * 1024 * 1024;
+
+// Build window cards
+const container = document.getElementById('windowsContainer');
+for (let i = 1; i <= 10; i++) {
+  container.innerHTML += `
+    <div class="window-card" id="windowCard${i}">
+      <div class="window-label">Window ${i}</div>
+      <div class="form-group">
+        <label>📎 Upload Photo (optional)</label>
+        <div class="file-upload">
+          <input type="file" id="photo${i}" accept=".jpg,.jpeg,.png" onchange="handleFile(${i}, this)">
+          <div class="file-upload-label">
+            <span class="icon">📁</span>
+            <span id="fileLabel${i}">Choose photo file...</span>
+          </div>
+        </div>
+        <div class="file-name" id="fileName${i}"></div>
+        <div class="file-size-err" id="fileSizeErr${i}">❌ File exceeds 5MB limit</div>
+      </div>
+      <div class="form-group">
+        <label>Notes (location, severity, details)</label>
+        <textarea id="notes${i}" placeholder="e.g. Kitchen window, top-left corner crack, been there 2 months..."></textarea>
+      </div>
+    </div>`;
+}
+
+function handleFile(i, input) {
+  const file = input.files[0];
+  const nameEl = document.getElementById('fileName' + i);
+  const errEl = document.getElementById('fileSizeErr' + i);
+  const labelEl = document.getElementById('fileLabel' + i);
+
+  if (!file) return;
+
+  if (file.size > MAX_SIZE) {
+    errEl.style.display = 'block';
+    nameEl.style.display = 'none';
+    input.value = '';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  nameEl.style.display = 'block';
+  nameEl.textContent = '✅ ' + file.name;
+  labelEl.textContent = file.name;
+}
+
+// Show/hide other description
+document.getElementById('issueType').addEventListener('change', function() {
+  document.getElementById('otherDescGroup').style.display = this.value === 'Other' ? 'block' : 'none';
+});
+
+document.getElementById('windowForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const email = document.getElementById('submitterEmail').value.trim();
+  const emailInvalid = !email || !email.includes('@');
+  document.getElementById('submitterEmail').classList.toggle('error', emailInvalid);
+  document.getElementById('submitterEmailErr').classList.toggle('show', emailInvalid);
+  if (emailInvalid) return;
+
+  const issueType = document.getElementById('issueType').value;
+  if (!issueType) {
+    document.getElementById('alertError').textContent = '❌ Please select an issue type.';
+    document.getElementById('alertError').classList.add('show');
+    return;
+  }
+
+  // Collect windows
+  const windows = [];
+  for (let i = 1; i <= 10; i++) {
+    const photo = document.getElementById('photo' + i).files[0];
+    const notes = document.getElementById('notes' + i).value.trim();
+    if (!photo && !notes) continue;
+    windows.push({ index: i, photo, notes });
+  }
+
+  if (windows.length === 0) {
+    document.getElementById('alertError').textContent = '❌ Please add at least one window photo or notes.';
+    document.getElementById('alertError').classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  const progressBar = document.getElementById('progressBar');
+  const progressFill = document.getElementById('progressFill');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+  progressBar.style.display = 'block';
+  document.getElementById('alertError').classList.remove('show');
+
+  try {
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('issue_type', issueType);
+    if (issueType === 'Other') {
+      formData.append('other_description', document.getElementById('otherDescription').value.trim());
+    }
+
+    const windowsMeta = [];
+    for (const w of windows) {
+      windowsMeta.push({ window_number: w.index, notes: w.notes || null });
+      if (w.photo) {
+        formData.append(`photo_w${w.index}`, w.photo, `w${w.index}_${w.photo.name}`);
+      }
+    }
+    formData.append('windows_meta', JSON.stringify(windowsMeta));
+
+    progressFill.style.width = '50%';
+
+    // Post to n8n as multipart/form-data — browser sets Content-Type with boundary automatically
+    const res = await fetch(N8N_WEBHOOK, {
+      method: 'POST',
+      body: formData
+    });
+
+    progressFill.style.width = '100%';
+
+    if (res.ok) {
+      document.getElementById('alertSuccess').textContent = '✅ Thank you! We have received your window details and will prepare your estimate within 1 business day.';
+      document.getElementById('alertSuccess').classList.add('show');
+      document.getElementById('windowForm').style.display = 'none';
+    } else {
+      throw new Error('Submission failed. Please try again.');
+    }
+
+  } catch (err) {
+    document.getElementById('alertError').textContent = '❌ ' + err.message;
+    document.getElementById('alertError').classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Submit Window Details →';
+    progressBar.style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>
