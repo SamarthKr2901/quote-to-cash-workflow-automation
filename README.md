@@ -7,7 +7,7 @@
 > manual sales cycle with a system the sales manager only touches once
 > per deal, to approve a quote.
 
-[![n8n](https://img.shields.io/badge/n8n-self--hosted-EA4B71?logo=n8n&logoColor=white)](https://n8n.io)
+[![n8n](https://img.shields.io/badge/n8n-orchestration-EA4B71?logo=n8n&logoColor=white)](https://n8n.io)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com)
 [![Anthropic](https://img.shields.io/badge/Anthropic-Claude-D97757?logo=anthropic&logoColor=white)](https://www.anthropic.com)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4-412991?logo=openai&logoColor=white)](https://openai.com)
@@ -36,7 +36,7 @@
   quote in the CRM. Everything else — estimate generation, customer
   email, follow-ups, payment, post-sale review — is automated.
 
-🎥 **5-minute walkthrough:** [Loom video](https://www.loom.com/share/edfbc9e1e76b41e0be5fb3d06a5ef9cb)
+🎥 **Video walkthrough:** [Loom](https://www.loom.com/share/edfbc9e1e76b41e0be5fb3d06a5ef9cb)
 
 ---
 
@@ -44,32 +44,32 @@
 
 ```mermaid
 flowchart LR
-    Form1[/"Form 1<br/>web intake"/]
-    Form2[/"Form 2<br/>window details"/]
-    Phone(["Inbound call"])
-    CRM[/"Manager CRM"/]
+    Web[/"Form 1<br/>web intake"/]
+    Call(["Inbound<br/>call"])
+    CRM[/"Manager<br/>CRM"/]
     Stripe(["Stripe"])
 
-    WF1["WF1<br/>Lead Capture"]
-    WF7["WF7<br/>Inbound Voice Intake"]
-    WF3OUT["WF3<br/>Outbound Voice"]
-    WF2["WF2<br/>Quote &amp; Payment"]
-    WF2B["WF2B<br/>Reminders"]
-    WF3PC["WF3<br/>Post-Call"]
+    WF7["WF7<br/>Inbound Voice"]
+    WF1["WF1<br/>Lead Capture<br/>+ AI Estimate"]
+    WF2["WF2<br/>Quote & Payment"]
     WF3PP["WF3<br/>Post-Payment"]
 
-    Form1 --> WF1
-    Phone --> WF7
-    WF7 -.->|Form 2 email| Form2
-    WF1 -.->|Form 2 email| Form2
-    Form2 --> WF1
-    WF1 --> WF3OUT
-    WF1 --> WF2
-    CRM --> WF2
+    WF3OUT["WF3<br/>Outbound Voice"]
+    WF3PC["WF3<br/>Post-Call"]
+    WF2B["WF2B<br/>Reminders"]
+
+    Web    --> WF1
+    Call   --> WF7
+    WF7    --> WF1
+    WF1    --> WF2
+    CRM    --> WF2
     Stripe --> WF2
-    WF2 --> WF3PP
-    WF3OUT -.-> WF3PC
-    WF7 -.-> WF3PC
+    WF2    --> WF3PP
+
+    WF1    --> WF3OUT
+    WF3OUT --> WF3PC
+    WF7    --> WF3PC
+    WF2    --> WF2B
 
     classDef core fill:#1e293b,stroke:#3b82f6,color:#fff
     classDef voice fill:#3d1f5e,stroke:#a371f7,color:#fff
@@ -78,6 +78,13 @@ flowchart LR
     class WF7,WF3OUT,WF3PC voice
     class WF2B sched
 ```
+
+The voice agents (WF7 inbound, WF3 Outbound) and the cron-driven WF2B
+share back-end webhooks with the main funnel; the diagram shows the
+edges as plain arrows for readability — see
+[`docs/architecture.md`](docs/architecture.md) for the full
+edge-by-edge map including the Form 2 email loop and dotted /
+fire-and-forget dispatches.
 
 For the full architecture (data model, design decisions, security
 debt), see [`docs/architecture.md`](docs/architecture.md).
@@ -235,17 +242,24 @@ are a tooling choice worth knowing about.
 
 ## Status
 
-Built for a paying client. All seven workflows are deployed and active
-in production. There is a prioritized list of known bugs and security
-debt in
-[`docs/reference/APEX_CONTEXT.md`](docs/reference/APEX_CONTEXT.md) §7–§9,
-kept openly because honest internal docs are more useful than
-optimistic ones.
+Built end-to-end for a real client engagement (Apex Windows TX, via
+OyeLabs). The system is fully deployed and tested on production-grade
+infrastructure — Contabo VPS, Supabase, real Twilio / ElevenLabs /
+Stripe accounts — and pre-sale validation is currently in progress
+with the client. Live revenue traffic hasn't started yet; the
+architecture and the test runs are real.
 
-This repo is a portfolio showcase, not a runnable replica — the
-sanitized JSON exports and HTML files won't import or deploy without
-re-binding credentials and replacing the `{{N8N_BASE_URL}}` /
-`{{SUPABASE_PROJECT_URL}}` / Stripe / Gmail / OpenAI placeholders.
+This repo is the architecture and source of record, not a runnable
+replica — the JSON exports and HTML files have been sanitized
+(infrastructure URLs, Supabase project IDs, JWTs, Stripe keys, n8n
+credential and workflow IDs all replaced with `{{PLACEHOLDER}}`
+tokens). Importing the JSONs into a fresh n8n instance and re-binding
+real credentials would reproduce the system; that's outside what this
+repo is meant to demonstrate.
+
+A prioritized list of known bugs and security debt is kept openly in
+[`docs/reference/APEX_CONTEXT.md`](docs/reference/APEX_CONTEXT.md)
+§7–§9 — honest internal docs are more useful than optimistic ones.
 
 ---
 
@@ -257,5 +271,5 @@ re-binding credentials and replacing the `{{N8N_BASE_URL}}` /
 
 If you're a recruiter or hiring manager and want a deeper walkthrough
 than the docs here, the
-[Loom video](https://www.loom.com/share/edfbc9e1e76b41e0be5fb3d06a5ef9cb)
-covers the system end-to-end in five minutes.
+[Loom](https://www.loom.com/share/edfbc9e1e76b41e0be5fb3d06a5ef9cb)
+walks the system end-to-end.
