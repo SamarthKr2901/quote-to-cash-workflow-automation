@@ -1,9 +1,9 @@
 # quote-to-cash workflow automation
 
 > An end-to-end **lead-to-payment** automation pipeline for a Texas
-> window-replacement business in the Dallas–Fort Worth metro. Seven
+> window-replacement business in the Dallas-Fort Worth metro. Seven
 > n8n workflows, AI-driven quote generation, voice agents on inbound
-> and outbound calls, and a Stripe payment loop — replacing a 100%
+> and outbound calls, and a Stripe payment loop, replacing a 100%
 > manual sales cycle with a system the sales manager only touches once
 > per deal, to approve a quote.
 
@@ -29,12 +29,12 @@
 - **12+ external integrations:** Anthropic Claude, OpenAI GPT-4,
   ElevenLabs, Twilio, Stripe, Google Calendar, Google Sheets, PDFShift,
   Gmail / SMTP, HubSpot, Supabase Storage.
-- **Two ways into the funnel** — web form *or* an inbound phone call
+- **Two ways into the funnel:** web form *or* an inbound phone call
   routed through an ElevenLabs agent that collects the same intake
   fields by voice.
 - **One human touchpoint by design:** the sales manager approves a
-  quote in the CRM. Everything else — estimate generation, customer
-  email, follow-ups, payment, post-sale review — is automated.
+  quote in the CRM. Everything else - estimate generation, customer
+  email, follow-ups, payment, post-sale review - is automated.
 
 🎥 **Video walkthrough:** [Loom](https://www.loom.com/share/edfbc9e1e76b41e0be5fb3d06a5ef9cb)
 
@@ -44,19 +44,19 @@
 
 ```mermaid
 flowchart LR
-    Web[/"Form 1<br/>web intake"/]
-    Call(["Inbound<br/>call"])
-    CRM[/"Manager<br/>CRM"/]
-    Stripe(["Stripe"])
+    Web[/\"Form 1<br/>web intake\"/]
+    Call([\"Inbound<br/>call\"])
+    CRM[/\"Manager<br/>CRM\"/]
+    Stripe([\"Stripe\"])
 
-    WF7["WF7<br/>Inbound Voice"]
-    WF1["WF1<br/>Lead Capture<br/>+ AI Estimate"]
-    WF2["WF2<br/>Quote & Payment"]
-    WF3PP["WF3<br/>Post-Payment"]
+    WF7[\"WF7<br/>Inbound Voice\"]
+    WF1[\"WF1<br/>Lead Capture<br/>+ AI Estimate\"]
+    WF2[\"WF2<br/>Quote & Payment\"]
+    WF3PP[\"WF3<br/>Post-Payment\"]
 
-    WF3OUT["WF3<br/>Outbound Voice"]
-    WF3PC["WF3<br/>Post-Call"]
-    WF2B["WF2B<br/>Reminders"]
+    WF3OUT[\"WF3<br/>Outbound Voice\"]
+    WF3PC[\"WF3<br/>Post-Call\"]
+    WF2B[\"WF2B<br/>Reminders\"]
 
     Web    --> WF1
     Call   --> WF7
@@ -81,7 +81,7 @@ flowchart LR
 
 The voice agents (WF7 inbound, WF3 Outbound) and the cron-driven WF2B
 share back-end webhooks with the main funnel; the diagram shows the
-edges as plain arrows for readability — see
+edges as plain arrows for readability - see
 [`docs/architecture.md`](docs/architecture.md) for the full
 edge-by-edge map including the Form 2 email loop and dotted /
 fire-and-forget dispatches.
@@ -121,7 +121,7 @@ PDF, and emails the sales manager.
 The SM clicks Approve (with optional price adjustment). That fires
 [WF2 sub-flow B](docs/workflows/wf2-quote-and-payment.md#sub-flow-b--manager-approved-manager-approved),
 which sends the customer a quote email containing two **magic-link
-URLs** (256-bit acceptance tokens — no login required) and inserts two
+URLs** (256-bit acceptance tokens, no login required) and inserts two
 escalation rows so [WF2B](docs/workflows/wf2b-reminders.md) and
 [WF3 Post-Payment](docs/workflows/wf3-post-payment.md) can chase
 non-responses.
@@ -193,33 +193,33 @@ quote-to-cash-workflow-automation/
 A few design moves worth opening if you want a deeper read on the
 trade-offs:
 
-- **Magic-link acceptance tokens** — 256-bit random tokens stored on
+- **Magic-link acceptance tokens:** 256-bit random tokens stored on
   the quote row, with the `status` column doing double duty as the
   state machine *and* the link's revocation flag. No sessions, no
   cookies, no expiry job.
   [details →](docs/workflows/wf2-quote-and-payment.md#magic-link-acceptance-token--the-auth-pattern-in-detail)
-- **Nine webhooks under one workflow** — WF2 holds the entire quote
+- **Nine webhooks under one workflow:** WF2 holds the entire quote
   lifecycle in a single editor view because all nine sub-flows share
   the same lead/quote/estimate fetch helpers. n8n quirks force every
   webhook into `responseMode: onReceived`.
   [details →](docs/architecture.md#42-one-workflow-many-webhooks)
-- **Unified escalation scheduler** — one `escalations` table with a
+- **Unified escalation scheduler:** one `escalations` table with a
   `type` column instead of per-workflow queues. Adding a new timed
   reminder is one INSERT and one filter clause.
   [details →](docs/architecture.md#43-escalation-table-as-a-unified-scheduler)
-- **AI estimate from photos + notes** — Form 2 collects no width /
+- **AI estimate from photos + notes:** Form 2 collects no width /
   height / glass-type fields. Claude infers what it needs from the
   photos and customer-written notes, with `pricing_config` as the
   price floor. Manual SM adjustment is supported via
   `quotes.adjusted_total`.
   [details →](docs/workflows/wf1-lead-capture.md#flow-b-window-details-and-ai-estimate-apex-window-details-v2)
-- **Voice agent webhook chain** — inbound and outbound voice agents
+- **Voice agent webhook chain:** inbound and outbound voice agents
   share one toolset (booking, availability, status) backed by webhooks
   in WF3 Post-Call. The inbound agent additionally captures `lead_id`
   via ElevenLabs Dynamic Variable Assignment and threads it through
   every subsequent tool call in the same conversation.
   [details →](docs/workflows/wf7-inbound-call.md#response-back-to-the-agent)
-- **Documented bugs over hidden ones** — the design docs include
+- **Documented bugs over hidden ones:** the design docs include
   callouts on real bugs that took real time to find (the
   `$json.body.lead_id` vs `$json.lead_id` cross-trigger payload bug,
   the empty-calendar / past-date LLM bug pair). They're more useful
@@ -244,13 +244,13 @@ are a tooling choice worth knowing about.
 
 Built end-to-end for a real client engagement (Apex Windows TX, via
 OyeLabs). The system is fully deployed and tested on production-grade
-infrastructure — Contabo VPS, Supabase, real Twilio / ElevenLabs /
-Stripe accounts — and pre-sale validation is currently in progress
+infrastructure - Contabo VPS, Supabase, real Twilio / ElevenLabs /
+Stripe accounts - and pre-sale validation is currently in progress
 with the client. Live revenue traffic hasn't started yet; the
 architecture and the test runs are real.
 
 This repo is the architecture and source of record, not a runnable
-replica — the JSON exports and HTML files have been sanitized
+replica: the JSON exports and HTML files have been sanitized
 (infrastructure URLs, Supabase project IDs, JWTs, Stripe keys, n8n
 credential and workflow IDs all replaced with `{{PLACEHOLDER}}`
 tokens). Importing the JSONs into a fresh n8n instance and re-binding
@@ -259,7 +259,7 @@ repo is meant to demonstrate.
 
 A prioritized list of known bugs and security debt is kept openly in
 [`docs/reference/APEX_CONTEXT.md`](docs/reference/APEX_CONTEXT.md)
-§7–§9 — honest internal docs are more useful than optimistic ones.
+§7-§9 — honest internal docs are more useful than optimistic ones.
 
 ---
 
